@@ -20,11 +20,7 @@
 //! ```
 //! use rocksdb::{DB, Options};
 //! // NB: db is automatically closed at end of lifetime
-//! let tempdir = tempfile::Builder::new()
-//!     .prefix("_path_for_rocksdb_storage")
-//!     .tempdir()
-//!     .expect("Failed to create temporary path for the _path_for_rocksdb_storage");
-//! let path = tempdir.path();
+//! let path = "_path_for_rocksdb_storage";
 //! {
 //!    let db = DB::open_default(path).unwrap();
 //!    db.put(b"my key", b"my value").unwrap();
@@ -43,11 +39,7 @@
 //! ```
 //! use rocksdb::{DB, ColumnFamilyDescriptor, Options};
 //!
-//! let tempdir = tempfile::Builder::new()
-//!     .prefix("_path_for_rocksdb_storage_with_cfs")
-//!     .tempdir()
-//!     .expect("Failed to create temporary path for the _path_for_rocksdb_storage_with_cfs.");
-//! let path = tempdir.path();
+//! let path = "_path_for_rocksdb_storage_with_cfs";
 //! let mut cf_opts = Options::default();
 //! cf_opts.set_max_write_buffer_number(16);
 //! let cf = ColumnFamilyDescriptor::new("cf1", cf_opts);
@@ -109,24 +101,23 @@ mod write_batch;
 pub use crate::{
     column_family::{
         AsColumnFamilyRef, BoundColumnFamily, ColumnFamily, ColumnFamilyDescriptor,
-        ColumnFamilyRef, ColumnFamilyTtl, DEFAULT_COLUMN_FAMILY_NAME,
+        ColumnFamilyRef, DEFAULT_COLUMN_FAMILY_NAME,
     },
     compaction_filter::Decision as CompactionDecision,
     db::{
-        DBAccess, DBCommon, DBWithThreadMode, LiveFile, MultiThreaded, Range, SingleThreaded,
-        ThreadMode, DB,
+        DBAccess, DBCommon, DBWithThreadMode, LiveFile, MultiThreaded, SingleThreaded, ThreadMode,
+        DB, ColumnFamilyMetaData,
     },
     db_iterator::{
         DBIterator, DBIteratorWithThreadMode, DBRawIterator, DBRawIteratorWithThreadMode,
         DBWALIterator, Direction, IteratorMode,
     },
     db_options::{
-        BlockBasedIndexType, BlockBasedOptions, BlockBasedTablePinningTier,
-        BottommostLevelCompaction, Cache, ChecksumType, CompactOptions, CompactionPri,
-        CuckooTableOptions, DBCompactionStyle, DBCompressionType, DBPath, DBRecoveryMode,
-        DataBlockIndexType, FifoCompactOptions, FlushOptions, InfoLogger,
-        IngestExternalFileOptions, KeyEncodingType, LogLevel, LruCacheOptions, MemtableFactory,
-        Options, PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
+        BlockBasedIndexType, BlockBasedOptions, BottommostLevelCompaction, Cache, ChecksumType,
+        CompactOptions, CuckooTableOptions, DBCompactionStyle, DBCompressionType, DBPath,
+        DBRecoveryMode, DataBlockIndexType, FifoCompactOptions, FlushOptions,
+        IngestExternalFileOptions, KeyEncodingType, LogLevel, MemtableFactory, Options,
+        PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
         UniversalCompactionStopStyle, WaitForCompactOptions, WriteBufferManager, WriteOptions,
     },
     db_pinnable_slice::DBPinnableSlice,
@@ -142,16 +133,8 @@ pub use crate::{
         OptimisticTransactionDB, OptimisticTransactionOptions, Transaction, TransactionDB,
         TransactionDBOptions, TransactionOptions,
     },
-    write_batch::{
-        WriteBatch, WriteBatchIterator, WriteBatchIteratorCf, WriteBatchWithTransaction,
-    },
+    write_batch::{WriteBatch, WriteBatchIterator, WriteBatchWithTransaction},
 };
-
-#[cfg(feature = "raw-ptr")]
-mod raw_ptr;
-
-#[cfg(feature = "raw-ptr")]
-pub use crate::raw_ptr::AsRawPtr;
 
 use librocksdb_sys as ffi;
 
