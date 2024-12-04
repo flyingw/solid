@@ -56,7 +56,11 @@ type DefaultThreadMode = crate::MultiThreaded;
 ///
 /// ```
 /// use rocksdb::{DB, Options, TransactionDB, SingleThreaded};
-/// let path = "_path_for_transaction_db";
+/// let tempdir = tempfile::Builder::new()
+///     .prefix("_path_for_transaction_db")
+///     .tempdir()
+///     .expect("Failed to create temporary path for the _path_for_transaction_db");
+/// let path = tempdir.path();
 /// {
 ///     let db: TransactionDB = TransactionDB::open_default(path).unwrap();
 ///     db.put(b"my key", b"my value").unwrap();
@@ -509,13 +513,14 @@ impl<T: ThreadMode> TransactionDB<T> {
         key: K,
         readopts: &ReadOptions,
     ) -> Result<Option<DBPinnableSlice>, Error> {
+        let key = key.as_ref();
         unsafe {
             let val = ffi_try!(ffi::rocksdb_transactiondb_get_pinned_cf(
                 self.inner,
                 readopts.inner,
                 cf.inner(),
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
             ));
             if val.is_null() {
                 Ok(None)
@@ -546,7 +551,10 @@ impl<T: ThreadMode> TransactionDB<T> {
     {
         let (keys, keys_sizes): (Vec<Box<[u8]>>, Vec<_>) = keys
             .into_iter()
-            .map(|k| (Box::from(k.as_ref()), k.as_ref().len()))
+            .map(|key| {
+                let key = key.as_ref();
+                (Box::from(key), key.len())
+            })
             .unzip();
         let ptr_keys: Vec<_> = keys.iter().map(|k| k.as_ptr() as *const c_char).collect();
 
@@ -595,7 +603,10 @@ impl<T: ThreadMode> TransactionDB<T> {
     {
         let (cfs_and_keys, keys_sizes): (Vec<(_, Box<[u8]>)>, Vec<_>) = keys
             .into_iter()
-            .map(|(cf, key)| ((cf, Box::from(key.as_ref())), key.as_ref().len()))
+            .map(|(cf, key)| {
+                let key = key.as_ref();
+                ((cf, Box::from(key)), key.len())
+            })
             .unzip();
         let ptr_keys: Vec<_> = cfs_and_keys
             .iter()
@@ -647,14 +658,16 @@ impl<T: ThreadMode> TransactionDB<T> {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
+        let key = key.as_ref();
+        let value = value.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_put(
                 self.inner,
                 writeopts.inner,
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
-                value.as_ref().as_ptr() as *const c_char,
-                value.as_ref().len() as size_t
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+                value.as_ptr() as *const c_char,
+                value.len() as size_t
             ));
         }
         Ok(())
@@ -671,15 +684,17 @@ impl<T: ThreadMode> TransactionDB<T> {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
+        let key = key.as_ref();
+        let value = value.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_put_cf(
                 self.inner,
                 writeopts.inner,
                 cf.inner(),
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
-                value.as_ref().as_ptr() as *const c_char,
-                value.as_ref().len() as size_t
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+                value.as_ptr() as *const c_char,
+                value.len() as size_t
             ));
         }
         Ok(())
@@ -725,14 +740,16 @@ impl<T: ThreadMode> TransactionDB<T> {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
+        let key = key.as_ref();
+        let value = value.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_merge(
                 self.inner,
                 writeopts.inner,
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
-                value.as_ref().as_ptr() as *const c_char,
-                value.as_ref().len() as size_t,
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+                value.as_ptr() as *const c_char,
+                value.len() as size_t,
             ));
             Ok(())
         }
@@ -749,15 +766,17 @@ impl<T: ThreadMode> TransactionDB<T> {
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
+        let key = key.as_ref();
+        let value = value.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_merge_cf(
                 self.inner,
                 writeopts.inner,
                 cf.inner(),
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
-                value.as_ref().as_ptr() as *const c_char,
-                value.as_ref().len() as size_t,
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+                value.as_ptr() as *const c_char,
+                value.len() as size_t,
             ));
             Ok(())
         }
@@ -780,12 +799,13 @@ impl<T: ThreadMode> TransactionDB<T> {
         key: K,
         writeopts: &WriteOptions,
     ) -> Result<(), Error> {
+        let key = key.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_delete(
                 self.inner,
                 writeopts.inner,
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
             ));
         }
         Ok(())
@@ -797,13 +817,14 @@ impl<T: ThreadMode> TransactionDB<T> {
         key: K,
         writeopts: &WriteOptions,
     ) -> Result<(), Error> {
+        let key = key.as_ref();
         unsafe {
             ffi_try!(ffi::rocksdb_transactiondb_delete_cf(
                 self.inner,
                 writeopts.inner,
                 cf.inner(),
-                key.as_ref().as_ptr() as *const c_char,
-                key.as_ref().len() as size_t,
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
             ));
         }
         Ok(())
@@ -977,8 +998,11 @@ impl TransactionDB<SingleThreaded> {
 impl TransactionDB<MultiThreaded> {
     /// Creates column family with given name and options.
     pub fn create_cf<N: AsRef<str>>(&self, name: N, opts: &Options) -> Result<(), Error> {
+        // Note that we acquire the cfs lock before inserting: otherwise we might race
+        // another caller who observed the handle as missing.
+        let mut cfs = self.cfs.cfs.write().unwrap();
         let inner = self.create_inner_cf_handle(name.as_ref(), opts)?;
-        self.cfs.cfs.write().unwrap().insert(
+        cfs.insert(
             name.as_ref().to_string(),
             Arc::new(UnboundColumnFamily { inner }),
         );

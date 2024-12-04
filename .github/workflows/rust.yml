@@ -1,8 +1,8 @@
 name: RocksDB CI
 
-on: [ push, pull_request ]
+on: [push, pull_request]
 env:
-  RUST_VERSION: 1.70.0
+  RUST_VERSION: 1.71.1
 
 jobs:
   fmt:
@@ -49,7 +49,16 @@ jobs:
       - name: Set PKG_CONFIG_PATH
         run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          cargo clippy --all-targets --features \
+            "jemalloc \
+            io-uring \
+            valgrind \
+            mt_static \
+            rtti \
+            multi-threaded-cf \
+            serde1" \
+            -- -D warnings
 
   audit:
     name: Security audit
@@ -68,7 +77,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [ Linux, macOS, Windows ]
+        build: [Linux, macOS, Windows]
         include:
           - build: Linux
             os: ubuntu-latest
@@ -90,12 +99,35 @@ jobs:
       - name: Install dependencies
         if: runner.os == 'Windows'
         run: choco install llvm -y
+      - name: Mark working directory as read-only
+        # to ensure that the tests always use a temporary directory
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p target
+          touch Cargo.lock
+          git submodule update --init --recursive
+          chmod -R a-w .
+          chmod -R a+w target Cargo.lock
       - name: Run rocksdb tests
         run: |
           cargo test --all
           cargo test --all --features multi-threaded-cf
+      - name: Mark working directory as writable
+        if: runner.os == 'Linux'
+        run: chmod -R a+w .
       - name: Free disk space
         run: cargo clean
+      - name: Mark working directory as read-only
+        # to ensure that the tests always use a temporary directory
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p target
+          touch Cargo.lock
+          chmod -R a-w .
+          chmod -R a+w target Cargo.lock
       - name: Run rocksdb tests (jemalloc)
         if: runner.os != 'Windows'
         run: cargo test --all --features jemalloc
+      - name: Mark working directory as writable
+        if: runner.os == 'Linux'
+        run: chmod -R a+w .

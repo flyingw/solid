@@ -1112,7 +1112,10 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
     {
         let (keys, keys_sizes): (Vec<Box<[u8]>>, Vec<_>) = keys
             .into_iter()
-            .map(|k| (Box::from(k.as_ref()), k.as_ref().len()))
+            .map(|k| {
+                let k = k.as_ref();
+                (Box::from(k), k.len())
+            })
             .unzip();
         let ptr_keys: Vec<_> = keys.iter().map(|k| k.as_ptr() as *const c_char).collect();
 
@@ -1161,7 +1164,10 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
     {
         let (cfs_and_keys, keys_sizes): (Vec<(_, Box<[u8]>)>, Vec<_>) = keys
             .into_iter()
-            .map(|(cf, key)| ((cf, Box::from(key.as_ref())), key.as_ref().len()))
+            .map(|(cf, key)| {
+                let key = key.as_ref();
+                ((cf, Box::from(key)), key.len())
+            })
             .unzip();
         let ptr_keys: Vec<_> = cfs_and_keys
             .iter()
@@ -2480,8 +2486,11 @@ impl<I: DBInner> DBCommon<SingleThreaded, I> {
 impl<I: DBInner> DBCommon<MultiThreaded, I> {
     /// Creates column family with given name and options
     pub fn create_cf<N: AsRef<str>>(&self, name: N, opts: &Options) -> Result<(), Error> {
+        // Note that we acquire the cfs lock before inserting: otherwise we might race
+        // another caller who observed the handle as missing.
+        let mut cfs = self.cfs.cfs.write().unwrap();
         let inner = self.create_inner_cf_handle(name.as_ref(), opts)?;
-        self.cfs.cfs.write().unwrap().insert(
+        cfs.insert(
             name.as_ref().to_string(),
             Arc::new(UnboundColumnFamily { inner }),
         );
