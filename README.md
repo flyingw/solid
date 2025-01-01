@@ -5,7 +5,7 @@
 [![documentation](https://docs.rs/rocksdb/badge.svg)](https://docs.rs/rocksdb)
 [![license](https://img.shields.io/crates/l/rocksdb.svg)](https://github.com/rust-rocksdb/rust-rocksdb/blob/master/LICENSE)
 [![Gitter chat](https://badges.gitter.im/rust-rocksdb/gitter.svg)](https://gitter.im/rust-rocksdb/lobby)
-![rust 1.70.0 required](https://img.shields.io/badge/rust-1.70.0-blue.svg?label=MSRV)
+![rust 1.71.1 required](https://img.shields.io/badge/rust-1.71.1-blue.svg?label=MSRV)
 
 ![GitHub commits (since latest release)](https://img.shields.io/github/commits-since/rust-rocksdb/rust-rocksdb/latest.svg)
 
@@ -58,7 +58,7 @@ data structures use `RwLock` by default. Alternatively, you can directly create
 
 The feature `mt_static` will request the library to be built with [/MT](https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170)
 flag, which results in library using the static version of the run-time library.
-*This can be useful in case there's a conflict in the dependecy tree between different
+*This can be useful in case there's a conflict in the dependency tree between different
 run-time versions.*
 
 ## Switch between static and dynamic linking for bindgen (features `bindgen-static` and `bindgen-runtime`)
@@ -77,3 +77,12 @@ features = ["bindgen-static", "snappy", "lz4", "zstd", "zlib", "bzip2"]
 ```
 
 Notice that `runtime` and `static` features are mutually exclusive, and won't compile if both enabled.
+
+## LTO
+Enable the `lto` feature to enable link-time optimization. It will compile rocksdb with `-flto` flag. This feature is disabled by default.
+
+> [!IMPORTANT]
+> You must use clang as `CC`. Eg. `CC=/usr/bin/clang CXX=/usr/bin/clang++`. Clang llvm version must be the same as the one used by rust compiler.
+> On the rust side you should use `RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld"`.
+
+Check the [Rust documentation](https://doc.rust-lang.org/rustc/linker-plugin-lto.html) for more information.

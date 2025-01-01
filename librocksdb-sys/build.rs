@@ -23,10 +23,7 @@ fn fail_on_empty_directory(name: &str) {
 }
 
 fn rocksdb_include_dir() -> String {
-    match env::var("ROCKSDB_INCLUDE_DIR") {
-        Ok(val) => val,
-        Err(_) => "rocksdb/include".to_string(),
-    }
+    env::var("ROCKSDB_INCLUDE_DIR").unwrap_or_else(|_| "rocksdb/include".to_string())
 }
 
 fn bindgen_rocksdb() {
@@ -88,6 +85,17 @@ fn build_rocksdb() {
 
     if cfg!(feature = "rtti") {
         config.define("USE_RTTI", Some("1"));
+    }
+
+    // https://github.com/facebook/rocksdb/blob/be7703b27d9b3ac458641aaadf27042d86f6869c/Makefile#L195
+    if cfg!(feature = "lto") {
+        config.flag("-flto");
+        if !config.get_compiler().is_like_clang() {
+            panic!(
+                "LTO is only supported with clang. Either disable the `lto` feature\
+             or set `CC=/usr/bin/clang CXX=/usr/bin/clang++` environment variables."
+            );
+        }
     }
 
     config.include(".");
@@ -376,7 +384,7 @@ fn main() {
 
     if !try_to_find_and_link_lib("ROCKSDB") {
         // rocksdb only works with the prebuilt rocksdb system lib on freebsd.
-        // we dont need to rebuild rocksdb
+        // we don't need to rebuild rocksdb
         if target.contains("freebsd") {
             println!("cargo:rustc-link-search=native=/usr/local/lib");
             let mode = match env::var_os("ROCKSDB_STATIC") {
