@@ -13,7 +13,7 @@
 // limitations under the License.
 //`
 
-use crate::{ffi, ffi_util::to_cpath, Error, Options};
+use crate::{ffi, ffi_util::to_cpath, Error, Options, column_family::AsColumnFamilyRef};
 
 use libc::{self, c_char, size_t};
 use std::{ffi::CString, marker::PhantomData, path::Path};
@@ -62,8 +62,23 @@ impl<'a> SstFileWriter<'a> {
         }
     }
 
+    pub fn create_cf(opts: &'a Options, cf: &impl AsColumnFamilyRef) -> Self {
+        let env_options = EnvOptions::default();
+
+        let writer = Self::create_raw_cf(opts, &env_options, cf);
+
+        Self {
+            inner: writer,
+            phantom: PhantomData,
+        }
+    }
+
     fn create_raw(opts: &Options, env_opts: &EnvOptions) -> *mut ffi::rocksdb_sstfilewriter_t {
         unsafe { ffi::rocksdb_sstfilewriter_create(env_opts.inner, opts.inner) }
+    }
+
+    fn create_raw_cf(opts: &Options, env_opts: &EnvOptions, cf: &impl AsColumnFamilyRef) -> *mut ffi::rocksdb_sstfilewriter_t {
+        unsafe { ffi::rocksdb_sstfilewriter_create_cf(env_opts.inner, opts.inner, cf.inner()) }
     }
 
     /// Prepare SstFileWriter to write into file located at "file_path".
