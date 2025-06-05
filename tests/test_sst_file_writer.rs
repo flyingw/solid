@@ -52,6 +52,48 @@ fn sst_file_writer_works() {
 }
 
 #[test]
+fn sst_file_writer_for_cf_works() {
+    let db_path = DBPath::new("_rust_rocksdb_sstfilewritertest_cf");
+    let mut opts = Options::default();
+    opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
+    let dir = tempfile::Builder::new()
+        .prefix("_rust_rocksdb_sstfilewritertest")
+        .tempdir()
+        .expect("Failed to create temporary path for file writer.");
+
+    let writer_path = dir.path().join("filewriter");
+    {
+        let mut db = DB::open(&opts, &db_path).unwrap();
+        let _ = db.create_cf("cf1", &opts).unwrap();
+        let cf1 = db.cf_handle("cf1").unwrap();
+        let mut writer = SstFileWriter::create_cf(&opts, &cf1);
+        writer.open(&writer_path).unwrap();
+        writer.put(b"k1", b"v1").unwrap();
+
+        writer.put(b"k2", b"v2").unwrap();
+
+        writer.delete(b"k3").unwrap();
+        writer.finish().unwrap();
+        assert!(writer.file_size() > 0);
+    }
+    {
+        let db = DB::open_cf(&opts, &db_path, ["cf1"]).unwrap();
+        let cf1 = db.cf_handle("cf1").unwrap();
+        
+        db.put_cf(&cf1, b"k3", b"v3").unwrap();
+        
+        db.ingest_external_file_cf(&cf1, vec![&writer_path]).unwrap();
+
+        let r: Result<Option<Vec<u8>>, Error> = db.get_cf(&cf1, b"k1");
+        assert_eq!(r.unwrap().unwrap(), b"v1");
+        let r: Result<Option<Vec<u8>>, Error> = db.get_cf(&cf1, b"k2");
+        assert_eq!(r.unwrap().unwrap(), b"v2");
+        assert!(db.get_cf(&cf1, b"k3").unwrap().is_none());
+    }
+}
+
+#[test]
 fn sst_file_writer_with_ts_works() {
     let db_path = DBPath::new("_rust_rocksdb_sstfilewritertest_with_ts");
     let dir = tempfile::Builder::new()
