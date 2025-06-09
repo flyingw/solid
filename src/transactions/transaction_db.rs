@@ -109,6 +109,20 @@ impl<T: ThreadMode> DBAccess for TransactionDB<T> {
         ffi::rocksdb_transactiondb_create_iterator_cf(self.inner, readopts.inner, cf_handle)
     }
 
+    unsafe fn create_iterator_coalescing(
+        &self,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: &ReadOptions,
+    ) -> *mut ffi::rocksdb_iterator_t {
+        let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
+
+        ffi::rocksdb_transactiondb_create_iterator_coalescing(
+            self.inner,
+            readopts.inner,
+            cfs.as_mut_ptr(), 
+            cfs.len() as libc::size_t)
+    }
+
     fn get_opt<K: AsRef<[u8]>>(
         &self,
         key: K,
