@@ -14,6 +14,7 @@
 
 use crate::{
     db::{DBAccess, DB},
+    column_family::AsColumnFamilyRef,
     ffi, Error, ReadOptions, WriteBatch,
 };
 use libc::{c_char, c_uchar, size_t};
@@ -102,6 +103,15 @@ impl<'a, D: DBAccess> DBRawIteratorWithThreadMode<'a, D> {
         readopts: ReadOptions,
     ) -> Self {
         let inner = unsafe { db.create_iterator_cf(cf_handle, &readopts) };
+        Self::from_inner(inner, readopts)
+    }
+
+    pub(crate) fn new_coalesce(
+        db: &'a D,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: ReadOptions,
+    ) -> Self {
+        let inner = unsafe { db.create_iterator_coalescing(cfs, &readopts) };
         Self::from_inner(inner, readopts)
     }
 

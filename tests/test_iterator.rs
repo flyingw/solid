@@ -16,7 +16,7 @@ mod util;
 
 use pretty_assertions::assert_eq;
 
-use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB};
+use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode};
 use util::{assert_iter, assert_iter_reversed, pair, DBPath};
 
 #[test]
@@ -240,6 +240,48 @@ fn test_custom_iterator() {
         opts.create_if_missing(true);
         let db = DB::open(&opts, &path).unwrap();
         let _data = custom_iter(&db).collect::<Vec<usize>>();
+    }
+}
+
+#[test]
+fn test_iterator_coalesce() {
+    let path = DBPath::new("_rust_rocksdb_coalesce_iterator_test");
+    {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        let db = DB::open_cf(&opts, &path, ["cf1", "cf2"]).unwrap();
+
+        const A1: &[u8] = b"a1";
+        const A2: &[u8] = b"a2";
+        const B1: &[u8] = b"b1";
+        const B2: &[u8] = b"b2";
+
+        let cf1 = db.cf_handle("cf1").unwrap();
+        let cf2 = db.cf_handle("cf2").unwrap();
+        
+        assert!(db.put_cf(&cf1, A1, A1).is_ok());
+        assert!(db.put_cf(&cf1, A2, A2).is_ok());
+        assert!(db.put_cf(&cf2, B1, B1).is_ok());
+        assert!(db.put_cf(&cf2, B2, B2).is_ok());
+
+        fn check<'a>(mut iter: DBRawIteratorWithThreadMode<'a, DB>, expeded: &[(Box<[u8]>, Box<[u8]>)]) {
+            iter.seek_to_first();
+      
+            let mut bins: Vec<(Box<[u8]>, Box<[u8]>)> = Vec::new();
+
+            while iter.valid() {
+                let key = iter.key().unwrap().into();
+                let va = iter.value().unwrap().into();
+                bins.push(pair(key, va));
+                iter.next();
+            }
+            assert_eq!(bins.as_slice(), expeded);
+        }
+
+        check(db.coalescing_iterator(&[&cf1]), &[pair(A1,A1), pair(A2,A2)]);
+        check(db.coalescing_iterator(&[&cf2]), &[pair(B1,B1), pair(B2,B2)]);
+        check(db.coalescing_iterator(&[&cf1, &cf2]), &[pair(A1,A1), pair(A2,A2), pair(B1,B1), pair(B2,B2)]);
     }
 }
 
