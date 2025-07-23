@@ -16,7 +16,7 @@ mod util;
 
 use pretty_assertions::assert_eq;
 
-use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode};
+use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode, WideColumns};
 use util::{assert_iter, assert_iter_reversed, pair, DBPath};
 
 #[test]
@@ -265,7 +265,7 @@ fn test_iterator_coalesce() {
         assert!(db.put_cf(&cf2, B1, B1).is_ok());
         assert!(db.put_cf(&cf2, B2, B2).is_ok());
 
-        fn check<'a>(mut iter: DBRawIteratorWithThreadMode<'a, DB>, expeded: &[(Box<[u8]>, Box<[u8]>)]) {
+        fn check<'a>(mut iter: DBRawIteratorWithThreadMode<'a, DB>, expected: &[(Box<[u8]>, Box<[u8]>)]) {
             iter.seek_to_first();
       
             let mut bins: Vec<(Box<[u8]>, Box<[u8]>)> = Vec::new();
@@ -276,12 +276,58 @@ fn test_iterator_coalesce() {
                 bins.push(pair(key, va));
                 iter.next();
             }
-            assert_eq!(bins.as_slice(), expeded);
+            assert_eq!(bins.as_slice(), expected);
         }
 
         check(db.coalescing_iterator(&[&cf1]), &[pair(A1,A1), pair(A2,A2)]);
         check(db.coalescing_iterator(&[&cf2]), &[pair(B1,B1), pair(B2,B2)]);
         check(db.coalescing_iterator(&[&cf1, &cf2]), &[pair(A1,A1), pair(A2,A2), pair(B1,B1), pair(B2,B2)]);
+    }
+}
+
+#[test]
+fn test_iterator_columns() {
+    let path = DBPath::new("_rust_rocksdb_terator_columns_test");
+    {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        let db = DB::open_cf(&opts, &path, ["cf1", "cf2"]).unwrap();
+        let cf1 = db.cf_handle("cf1").unwrap();
+        let _cf2 = db.cf_handle("cf2").unwrap();
+        const A1: &[u8] = b"a1"; // 97 49
+        const _A2: &[u8] = b"a2"; // 97 50
+        const _B1: &[u8] = b"b1";
+        const _B2: &[u8] = b"b2";
+
+        assert!(db.put_cf(&cf1, A1, A1).is_ok());
+        //assert!(db.put_cf(&cf1, A2, A2).is_ok());
+        //assert!(db.put_cf(&cf2, B1, B1).is_ok());
+        //assert!(db.put_cf(&cf2, B2, B2).is_ok());
+
+        let mut it = db.coalescing_iterator(&[&cf1]);
+        it.seek_to_first();
+
+        //let mut bin: Vec<WideColumns> = Vec::new();
+        let mut bin: Vec<Box<[u8]>> = Vec::new();
+
+        while it.valid() {
+            let _key: Box<[u8]> = it.key().unwrap().into();
+            let csx: Box<[u8]> = it.columns().unwrap().into();
+            //let csx: WideColumns = it.???().unwrap().into();
+
+            //assert_eq!(key, b"a1");
+            //let expected: Box<[u8]> = Box::<[u8;1]>::new([0;1]);
+            //assert_eq!(csx, expected);
+            bin.push(csx);
+            //bin.push(s);
+            it.next();
+        }
+        // columns? {}
+        //{"col_1": "cf_3_val_1", "col_2": "cf_1_val_2", "col_3": "cf_2_val_3", "col_4": "cf_3_val_4"}.
+        const AA: &[u8] = b"cf1:a1";
+
+        assert_eq!(bin.as_slice(), &[Box::from(AA)]);
     }
 }
 
