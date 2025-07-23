@@ -85,6 +85,7 @@ mod db;
 mod db_iterator;
 mod db_options;
 mod db_pinnable_slice;
+mod wide;
 mod env;
 mod iter_range;
 pub mod merge_operator;
@@ -120,6 +121,7 @@ pub use crate::{
         PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
         UniversalCompactionStopStyle, WaitForCompactOptions, WriteBufferManager, WriteOptions,
     },
+    wide::db_wide_columns::WideColumns,
     db_pinnable_slice::DBPinnableSlice,
     env::Env,
     ffi_util::CStrLike,
