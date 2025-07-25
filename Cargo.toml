@@ -1,9 +1,9 @@
 [package]
 name = "rocksdb"
 description = "Rust wrapper for Facebook's RocksDB embeddable database"
-version = "0.23.0"
+version = "0.23.1"
 edition = "2021"
-rust-version = "1.71.1"
+rust-version = "1.88.0"
 authors = [
     "Tyler Neely <t@jujit.su>",
     "David Greenberg <dsg123456789@gmail.com>",
@@ -38,7 +38,7 @@ lto = ["librocksdb-sys/lto"]
 
 [dependencies]
 libc = "0.2"
-librocksdb-sys = { path = "librocksdb-sys", version = "0.17.2", default-features = false, features = [
+librocksdb-sys = { path = "librocksdb-sys", version = "0.17.3", default-features = false, features = [
     "static",
 ] }
 serde = { version = "1", features = ["derive"], optional = true }
