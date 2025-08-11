@@ -348,13 +348,11 @@ fn test_iterator_attribute_group() {
 
         assert!(db.put_cf(&cf1, A1, A1).is_ok());
         assert!(db.put_cf(&cf1, A2, A2).is_ok());
-        assert!(db.put_cf(&cf2, B1, B1).is_ok());
-        assert!(db.put_cf(&cf2, B2, B2).is_ok());
+        assert!(db.put_cf(&cf2, A1, B1).is_ok());
+        assert!(db.put_cf(&cf2, A2, B2).is_ok());
 
-        let mut it = db.atg_iterator(&[&cf1]);
+        let mut it = db.atg_iterator(&[&cf1, &cf2]);
         it.seek_to_first();
-
-        //let mut bin: Vec<Vec<Vec<u8>>> = Vec::new();
         while it.valid() {
             let key: Box<[u8]> = it.key().unwrap().into();
             let csx: Vec<u8> = it.attribute_groups()
@@ -363,11 +361,9 @@ fn test_iterator_attribute_group() {
                 .filter(|o| o.is_some())
                 .flat_map(|ag| ag.unwrap())
                 .collect();
-
             println!(":{:?}-=>{:?}", key, csx);
             it.next();
         }
-        //println!("bin {:?}", &bin);
     }
 }
 
