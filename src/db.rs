@@ -21,8 +21,8 @@ use crate::{
     ffi,
     ffi_util::{from_cstr, opt_bytes_to_ptr, raw_data, to_cpath, CStrLike},
     ColumnFamily, ColumnFamilyDescriptor, CompactOptions, DBIteratorWithThreadMode,
-    DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, Direction, Error, FlushOptions,
-    IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
+    DBRawAttributeGroupIteratorWithThreadMode, DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, 
+    Direction, Error, FlushOptions, IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
     WaitForCompactOptions, WriteBatch, WriteOptions, DEFAULT_COLUMN_FAMILY_NAME,
 };
 
@@ -155,6 +155,12 @@ pub trait DBAccess {
         readopts: &ReadOptions,
     ) -> *mut ffi::rocksdb_iterator_t;
 
+    unsafe fn create_iterator_attribute_group(
+        &self,
+        handles: &[&impl AsColumnFamilyRef],
+        readopts: &ReadOptions,
+    ) -> *mut ffi::rocksdb_iterator_attributegroup_t;
+
     fn get_opt<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -233,6 +239,19 @@ impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
             self.inner.inner(),
             readopts.inner,
             cfs.as_mut_ptr(), 
+            cfs.len() as libc::size_t)
+    }
+
+    unsafe fn create_iterator_attribute_group(&self,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: &ReadOptions,
+    ) -> *mut ffi::rocksdb_iterator_attributegroup_t {
+        let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
+
+        ffi::rocksdb_create_iterator_attribute_group(
+            self.inner.inner(),
+            readopts.inner,
+            cfs.as_mut_ptr(),
             cfs.len() as libc::size_t)
     }
 
@@ -1521,6 +1540,14 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
     ) -> DBRawIteratorWithThreadMode<'b, Self> {
         let opts = ReadOptions::default();
         DBRawIteratorWithThreadMode::new_coalesce(self, cfs, opts)
+    }
+
+    pub fn atg_iterator<'a: 'b, 'b>(
+        &'a self,
+        cfs: &[&impl AsColumnFamilyRef]
+    )-> DBRawAttributeGroupIteratorWithThreadMode<'b, Self> {
+        let opts = ReadOptions::default();
+        DBRawAttributeGroupIteratorWithThreadMode::new(self, cfs, opts)
     }
 
     /// Opens a raw iterator over the database, using the default read options
