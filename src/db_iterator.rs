@@ -13,12 +13,133 @@
 // limitations under the License.
 
 use crate::{
+    db,
     db::{DBAccess, DB},
     column_family::AsColumnFamilyRef,
     ffi, Error, ReadOptions, WriteBatch,
 };
 use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
+use std::ptr;
+
+pub type DBATGIterator<'a> = DBRawAttributeGroupIteratorWithThreadMode<'a, DB>;
+
+pub struct DBRawAttributeGroupIteratorWithThreadMode<'a, D: DBAccess> {
+    inner: std::ptr::NonNull<ffi::rocksdb_iterator_attributegroup_t>,
+
+    /// When iterate_lower_bound or iterate_upper_bound are set, the inner
+    /// C iterator keeps a pointer to the upper bound inside `_readopts`.
+    /// Storing this makes sure the upper bound is always alive when the
+    /// iterator is being used.
+    ///
+    /// And yes, we need to store the entire ReadOptions structure since C++
+    /// ReadOptions keep reference to C rocksdb_readoptions_t wrapper which
+    /// point to vectors we own.  See issue #660.
+    _readopts: ReadOptions,
+
+    db: PhantomData<&'a D>,
+}
+
+impl<'a, D: DBAccess> DBRawAttributeGroupIteratorWithThreadMode<'a, D> {
+    pub(crate) fn new(
+        db: &'a D,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: ReadOptions,
+    ) -> Self{
+        let inner = unsafe { db.create_iterator_attribute_group(cfs, &readopts) };
+        Self::from_inner(inner, readopts)
+    }
+
+    /// Returns `true` if the iterator is valid. An iterator is invalidated when
+    /// it reaches the end of its defined range, or when it encounters an error.
+    ///
+    /// To check whether the iterator encountered an error after `valid` has
+    /// returned `false`, use the [`status`](DBRawIteratorWithThreadMode::status) method. `status` will never
+    /// return an error when `valid` is `true`.
+    pub fn valid(&self) -> bool {
+        unsafe { ffi::rocksdb_iter_atg_valid(self.inner.as_ptr()) != 0 }
+    }
+
+    pub fn seek_to_first(&mut self) {
+        unsafe {
+            ffi::rocksdb_iter_atg_seek_to_first(self.inner.as_ptr());
+        }
+    }
+
+    // Returns a slice of the current key.
+    pub fn key(&self) -> Option<&[u8]> {
+        if self.valid() {
+            Some(self.key_impl())
+        } else {
+            None
+        }
+    }
+
+    /// Seeks to the next key.
+    pub fn next(&mut self) {
+        if self.valid() {
+            unsafe {
+                ffi::rocksdb_iter_atg_next(self.inner.as_ptr());
+            }
+        }
+    }
+
+    pub fn attribute_groups(&mut self) -> Vec<Result<Option<Vec<u8>>, Error>>{
+        if self.valid() {
+            let mut len: size_t = 0;
+            let mut values: *mut *mut c_char = ptr::null_mut();
+            let mut values_sizes: *mut size_t = ptr::null_mut();
+            let mut errors: *mut *mut c_char = ptr::null_mut();
+            unsafe {
+                ffi::rocksdb_iter_attribute_groups(
+                    self.inner.as_ptr(),
+                    &mut values,
+                    &mut values_sizes,
+                    &mut errors, 
+                    &mut len,
+                );
+                let values = slice::from_raw_parts(values, len);
+                let values_sizes = slice::from_raw_parts(values_sizes, len);
+                let errors = slice::from_raw_parts(errors, len);
+                db::convert_values(values.to_vec(), values_sizes.to_vec(), errors.to_vec())
+            }
+        } else {
+            vec![]
+        }
+    }
+
+    /// Returns a slice of the current key; assumes the iterator is valid.
+    fn key_impl(&self) -> &[u8] {
+        // Safety Note: This is safe as all methods that may invalidate the buffer returned
+        // take `&mut self`, so borrow checker will prevent use of buffer after seek.
+        unsafe {
+            let mut key_len: size_t = 0;
+            let key_len_ptr: *mut size_t = &mut key_len;
+            let key_ptr = ffi::rocksdb_iter_atg_key(self.inner.as_ptr(), key_len_ptr);
+            slice::from_raw_parts(key_ptr as *const c_uchar, key_len)
+        }
+    }
+
+    fn from_inner(inner: *mut ffi::rocksdb_iterator_attributegroup_t, readopts: ReadOptions) -> Self {
+        let inner = std::ptr::NonNull::new(inner).unwrap();
+        Self {
+            inner,
+            _readopts: readopts,
+            db: PhantomData,
+        }
+    }
+}
+
+impl<D: DBAccess> Drop for DBRawAttributeGroupIteratorWithThreadMode<'_, D> {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::rocksdb_iter_attributegroup_destroy(self.inner.as_ptr());
+        }
+    }
+}
+
+unsafe impl<D: DBAccess> Send for DBRawAttributeGroupIteratorWithThreadMode<'_, D> {}
+unsafe impl<D: DBAccess> Sync for DBRawAttributeGroupIteratorWithThreadMode<'_, D> {}
 
 /// A type alias to keep compatibility. See [`DBRawIteratorWithThreadMode`] for details
 pub type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, DB>;
