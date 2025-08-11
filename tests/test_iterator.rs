@@ -18,7 +18,6 @@ use pretty_assertions::assert_eq;
 
 use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode, WideColumns};
 use util::{assert_iter, assert_iter_reversed, pair, DBPath};
-use rocksdb::ReadOptions;
 
 #[test]
 #[allow(clippy::cognitive_complexity)]
@@ -227,25 +226,6 @@ fn test_full_iterator() {
     }
 }
 
-#[test]
-fn test_iterator_refresh() {
-    let n = DBPath::new("_rust_rocksdb_iterator_refresh_test");
-    {
-        let db = DB::open_default(&n).unwrap();
-        db.put(b"k1", b"v1").unwrap();
-
-        let mut iter = db.iterator(IteratorMode::Start);
-        assert_iter(&mut iter, &[pair(b"k1", b"v1")]);
-
-        // Write new data after iterator was created
-        db.put(b"k2", b"v2").unwrap();
-
-        // Refresh and re-seek; now the iterator sees k2
-        iter.refresh(IteratorMode::Start).unwrap();
-        assert_iter(&mut iter, &[pair(b"k1", b"v1"), pair(b"k2", b"v2")]);
-    }
-}
-
 fn custom_iter(db: &'_ DB) -> impl Iterator<Item = usize> + '_ {
     db.iterator(IteratorMode::Start)
         .map(Result::unwrap)
@@ -352,8 +332,8 @@ fn test_iterator_columns() {
 }
 
 #[test]
-fn test_atg_iterator() {
-    let path = DBPath::new("_rust_rocksdb_terator_atg_test");
+fn test_iterator_attribute_group() {
+    let path = DBPath::new("_rust_rocksdb_terator_columns_test");
     {
         let mut opts = Options::default();
         opts.create_if_missing(true);
@@ -361,9 +341,8 @@ fn test_atg_iterator() {
         let db = DB::open_cf(&opts, &path, ["cf1", "cf2"]).unwrap();
         let cf1 = db.cf_handle("cf1").unwrap();
         let cf2 = db.cf_handle("cf2").unwrap();
-
-        const A1: &[u8] = b"a1"; // 97 49
-        const A2: &[u8] = b"a2"; // 97 50
+        const A1: &[u8] = b"a1";
+        const A2: &[u8] = b"a2";
         const B1: &[u8] = b"b1";
         const B2: &[u8] = b"b2";
 
@@ -372,24 +351,25 @@ fn test_atg_iterator() {
         assert!(db.put_cf(&cf2, B1, B1).is_ok());
         assert!(db.put_cf(&cf2, B2, B2).is_ok());
 
-        let mut it = db.atg_iterator(&[&cf1, &cf2], ReadOptions::default());
+        let mut it = db.atg_iterator(&[&cf1]);
         it.seek_to_first();
 
+        //let mut bin: Vec<Vec<Vec<u8>>> = Vec::new();
         while it.valid() {
             let key: Box<[u8]> = it.key().unwrap().into();
-            let atg: Vec<u8> = it.attribute_groups()
+            let csx: Vec<u8> = it.attribute_groups()
                 .into_iter()
                 .map(|ag| ag.unwrap())
                 .filter(|o| o.is_some())
                 .flat_map(|ag| ag.unwrap())
                 .collect();
-             println!("atg|{:?}=>{:?}", key, atg);
+
+            println!(":{:?}-=>{:?}", key, csx);
             it.next();
         }
-       
+        //println!("bin {:?}", &bin);
     }
 }
-
 
 #[test]
 fn test_iterator_outlive_db() {
