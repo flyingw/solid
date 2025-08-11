@@ -70,18 +70,18 @@ impl<DB> DBAccess for Transaction<'_, DB> {
             cfs.len() as libc::size_t)
     }
 
-    unsafe fn create_iterator_atg(
+    unsafe fn create_iterator_attribute_group(
         &self,
         cfs: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_atg_t {
+    ) -> *mut ffi::rocksdb_iterator_attributegroup_t {
         let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
 
-        ffi::rocksdb_transaction_create_iterator_atg(
+        ffi::rocksdb_transaction_create_iterator_attribute_group(
             self.inner,
-            cfs.as_mut_ptr(), 
-            cfs.len() as libc::size_t,
-            readopts.inner)
+            readopts.inner,
+            cfs.as_mut_ptr(),
+            cfs.len() as libc::size_t)
     }
 
     fn get_opt<K: AsRef<[u8]>>(
@@ -899,7 +899,7 @@ impl<DB> Transaction<'_, DB> {
         unsafe {
             let wi = ffi::rocksdb_transaction_get_writebatch_wi(self.inner);
             let mut len: usize = 0;
-            let ptr = ffi::rocksdb_writebatch_wi_data(wi, ptr::from_mut(&mut len));
+            let ptr = ffi::rocksdb_writebatch_wi_data(wi, &mut len as _);
             let writebatch = ffi::rocksdb_writebatch_create_from(ptr, len);
             ffi::rocksdb_free(wi as *mut c_void);
             WriteBatchWithTransaction { inner: writebatch }

@@ -20,7 +20,11 @@
 //! ```
 //! use rocksdb::{DB, Options};
 //! // NB: db is automatically closed at end of lifetime
-//! let path = "_path_for_rocksdb_storage";
+//! let tempdir = tempfile::Builder::new()
+//!     .prefix("_path_for_rocksdb_storage")
+//!     .tempdir()
+//!     .expect("Failed to create temporary path for the _path_for_rocksdb_storage");
+//! let path = tempdir.path();
 //! {
 //!    let db = DB::open_default(path).unwrap();
 //!    db.put(b"my key", b"my value").unwrap();
@@ -39,7 +43,11 @@
 //! ```
 //! use rocksdb::{DB, ColumnFamilyDescriptor, Options};
 //!
-//! let path = "_path_for_rocksdb_storage_with_cfs";
+//! let tempdir = tempfile::Builder::new()
+//!     .prefix("_path_for_rocksdb_storage_with_cfs")
+//!     .tempdir()
+//!     .expect("Failed to create temporary path for the _path_for_rocksdb_storage_with_cfs.");
+//! let path = tempdir.path();
 //! let mut cf_opts = Options::default();
 //! cf_opts.set_max_write_buffer_number(16);
 //! let cf = ColumnFamilyDescriptor::new("cf1", cf_opts);
@@ -102,7 +110,7 @@ mod write_batch;
 pub use crate::{
     column_family::{
         AsColumnFamilyRef, BoundColumnFamily, ColumnFamily, ColumnFamilyDescriptor,
-        ColumnFamilyRef, DEFAULT_COLUMN_FAMILY_NAME,
+        ColumnFamilyRef, ColumnFamilyTtl, DEFAULT_COLUMN_FAMILY_NAME,
     },
     compaction_filter::Decision as CompactionDecision,
     db::{
@@ -111,15 +119,14 @@ pub use crate::{
     },
     db_iterator::{
         DBIterator, DBIteratorWithThreadMode, DBRawIterator, DBRawIteratorWithThreadMode,
-        DBWALIterator, Direction, IteratorMode,
-        DBATGIterator, DBATGIteratorWithThreadMode,
+        DBWALIterator, Direction, IteratorMode, DBRawAttributeGroupIteratorWithThreadMode
     },
     db_options::{
         BlockBasedIndexType, BlockBasedOptions, BottommostLevelCompaction, Cache, ChecksumType,
-        CompactOptions, CuckooTableOptions, DBCompactionStyle, DBCompressionType, DBPath,
-        DBRecoveryMode, DataBlockIndexType, FifoCompactOptions, FlushOptions,
-        IngestExternalFileOptions, KeyEncodingType, LogLevel, MemtableFactory, Options,
-        PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
+        CompactOptions, CompactionPri, CuckooTableOptions, DBCompactionStyle, DBCompressionType,
+        DBPath, DBRecoveryMode, DataBlockIndexType, FifoCompactOptions, FlushOptions,
+        IngestExternalFileOptions, KeyEncodingType, LogLevel, LruCacheOptions, MemtableFactory,
+        Options, PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
         UniversalCompactionStopStyle, WaitForCompactOptions, WriteBufferManager, WriteOptions,
     },
     wide::db_wide_columns::WideColumns,
@@ -240,7 +247,7 @@ mod test {
         db_options::{CacheWrapper, WriteBufferManagerWrapper},
         env::{Env, EnvWrapper},
         BlockBasedOptions, BoundColumnFamily, Cache, ColumnFamily, ColumnFamilyDescriptor,
-        DBIterator, DBRawIterator, DBATGIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
+        DBIterator, DBRawIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
         ReadOptions, Snapshot, SstFileWriter, WriteBatch, WriteBufferManager, WriteOptions, DB,
     };
 
@@ -256,7 +263,6 @@ mod test {
         is_send::<DB>();
         is_send::<DBIterator<'_>>();
         is_send::<DBRawIterator<'_>>();
-        is_send::<DBATGIterator<'_>>();
         is_send::<Snapshot>();
         is_send::<Options>();
         is_send::<ReadOptions>();
