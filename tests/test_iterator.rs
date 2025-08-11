@@ -332,6 +332,46 @@ fn test_iterator_columns() {
 }
 
 #[test]
+fn test_iterator_attribute_group() {
+    let path = DBPath::new("_rust_rocksdb_terator_columns_test");
+    {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        let db = DB::open_cf(&opts, &path, ["cf1", "cf2"]).unwrap();
+        let cf1 = db.cf_handle("cf1").unwrap();
+        let cf2 = db.cf_handle("cf2").unwrap();
+        const A1: &[u8] = b"a1";
+        const A2: &[u8] = b"a2";
+        const B1: &[u8] = b"b1";
+        const B2: &[u8] = b"b2";
+
+        assert!(db.put_cf(&cf1, A1, A1).is_ok());
+        assert!(db.put_cf(&cf1, A2, A2).is_ok());
+        assert!(db.put_cf(&cf2, B1, B1).is_ok());
+        assert!(db.put_cf(&cf2, B2, B2).is_ok());
+
+        let mut it = db.atg_iterator(&[&cf1]);
+        it.seek_to_first();
+
+        //let mut bin: Vec<Vec<Vec<u8>>> = Vec::new();
+        while it.valid() {
+            let key: Box<[u8]> = it.key().unwrap().into();
+            let csx: Vec<u8> = it.attribute_groups()
+                .into_iter()
+                .map(|ag| ag.unwrap())
+                .filter(|o| o.is_some())
+                .flat_map(|ag| ag.unwrap())
+                .collect();
+
+            println!(":{:?}-=>{:?}", key, csx);
+            it.next();
+        }
+        //println!("bin {:?}", &bin);
+    }
+}
+
+#[test]
 fn test_iterator_outlive_db() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/fail/iterator_outlive_db.rs");
