@@ -22,7 +22,7 @@ use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
 use std::ptr;
 
-// pub type DBATGIterator<'a> = DBRawAttributeGroupIteratorWithThreadMode<'a, DB>;
+pub type DBAtgIterator<'a> = DBRawAttributeGroupIteratorWithThreadMode<'a, DB>;
 
 pub struct DBRawAttributeGroupIteratorWithThreadMode<'a, D: DBAccess> {
     inner: std::ptr::NonNull<ffi::rocksdb_iterator_attributegroup_t>,
