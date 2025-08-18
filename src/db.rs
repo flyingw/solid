@@ -155,6 +155,12 @@ pub trait DBAccess {
         readopts: &ReadOptions,
     ) -> *mut ffi::rocksdb_iterator_t;
 
+    unsafe fn create_iterator_atg(
+        &self,
+        handles: &[&impl AsColumnFamilyRef],
+        readopts: &ReadOptions,
+    ) -> *mut ffi::rocksdb_iterator_t;
+
     fn get_opt<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -228,7 +234,20 @@ impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
         readopts: &ReadOptions,
     ) -> *mut ffi::rocksdb_iterator_t {
         let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
+        ffi::rocksdb_create_iterator_coalescing(
+            self.inner.inner(),
+            readopts.inner,
+            cfs.as_mut_ptr(), 
+            cfs.len() as libc::size_t)
+    }
 
+    unsafe fn create_iterator_atg(
+        &self,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: &ReadOptions,
+    ) -> *mut ffi::rocksdb_iterator_t {
+        let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
+        // create atg
         ffi::rocksdb_create_iterator_coalescing(
             self.inner.inner(),
             readopts.inner,
@@ -1521,6 +1540,14 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
     ) -> DBRawIteratorWithThreadMode<'b, Self> {
         let opts = ReadOptions::default();
         DBRawIteratorWithThreadMode::new_coalesce(self, cfs, opts)
+    }
+
+    pub fn attribute_group_iterator<'a: 'b, 'b>(
+        &'a self,
+        cfs: &[&impl AsColumnFamilyRef],
+        opts: ReadOptions
+    ) -> DBRawIteratorWithThreadMode<'b, Self> {
+        DBRawIteratorWithThreadMode::new_atg(self, cfs, opts)
     }
 
     /// Opens a raw iterator over the database, using the default read options

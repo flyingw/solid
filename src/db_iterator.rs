@@ -115,6 +115,14 @@ impl<'a, D: DBAccess> DBRawIteratorWithThreadMode<'a, D> {
         Self::from_inner(inner, readopts)
     }
 
+    pub(crate) fn new_atg(db: &'a D,
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: ReadOptions,
+    ) -> Self {
+        let inner = unsafe { db.create_iterator_atg(cfs, &readopts) };
+        Self::from_inner(inner, readopts)
+    }
+
     fn from_inner(inner: *mut ffi::rocksdb_iterator_t, readopts: ReadOptions) -> Self {
         // This unwrap will never fail since rocksdb_create_iterator and
         // rocksdb_create_iterator_cf functions always return non-null. They
