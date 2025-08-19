@@ -18,6 +18,7 @@ use pretty_assertions::assert_eq;
 
 use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode, WideColumns};
 use util::{assert_iter, assert_iter_reversed, pair, DBPath};
+use rocksdb::ReadOptions;
 
 #[test]
 #[allow(clippy::cognitive_complexity)]
@@ -330,6 +331,47 @@ fn test_iterator_columns() {
         assert_eq!(bin.as_slice(), &[Box::from(AA)]);
     }
 }
+
+#[test]
+fn test_atg_iterator() {
+    let path = DBPath::new("_rust_rocksdb_terator_atg_test");
+    {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        let db = DB::open_cf(&opts, &path, ["cf1", "cf2"]).unwrap();
+        let cf1 = db.cf_handle("cf1").unwrap();
+        let cf2 = db.cf_handle("cf2").unwrap();
+
+        const A1: &[u8] = b"a1"; // 97 49
+        const A2: &[u8] = b"a2"; // 97 50
+        const B1: &[u8] = b"b1";
+        const B2: &[u8] = b"b2";
+
+        assert!(db.put_cf(&cf1, A1, A1).is_ok());
+        assert!(db.put_cf(&cf1, A2, A2).is_ok());
+        assert!(db.put_cf(&cf2, B1, B1).is_ok());
+        assert!(db.put_cf(&cf2, B2, B2).is_ok());
+
+        let mut it = db.attribute_group_iterator(&[&cf1, &cf2], ReadOptions::default());
+        it.seek_to_first();
+
+        while it.valid() {
+            let key: Box<[u8]> = it.key().unwrap().into();
+            let atg: Vec<u8> = it.attribute_groups()
+                .into_iter()
+                .map(|ag| ag.unwrap())
+                .filter(|o| o.is_some())
+                .flat_map(|ag| ag.unwrap())
+                .collect();
+             println!("atg|{:?}=>{:?}", key, atg);
+            it.next();
+        }
+
+       
+    }
+}
+
 
 #[test]
 fn test_iterator_outlive_db() {

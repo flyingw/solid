@@ -22,6 +22,7 @@ use crate::{
     ffi_util::{from_cstr, opt_bytes_to_ptr, raw_data, to_cpath, CStrLike},
     ColumnFamily, ColumnFamilyDescriptor, CompactOptions, DBIteratorWithThreadMode,
     DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, Direction, Error, FlushOptions,
+    DBATGIteratorWithThreadMode,
     IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
     WaitForCompactOptions, WriteBatch, WriteOptions, DEFAULT_COLUMN_FAMILY_NAME,
 };
@@ -159,7 +160,7 @@ pub trait DBAccess {
         &self,
         handles: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_t;
+    ) -> *mut ffi::rocksdb_iterator_atg_t;
 
     fn get_opt<K: AsRef<[u8]>>(
         &self,
@@ -245,14 +246,14 @@ impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
         &self,
         cfs: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_t {
+    ) -> *mut ffi::rocksdb_iterator_atg_t {
         let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
         // create atg
-        ffi::rocksdb_create_iterator_coalescing(
+        ffi::rocksdb_create_iterator_atg(
             self.inner.inner(),
-            readopts.inner,
             cfs.as_mut_ptr(), 
-            cfs.len() as libc::size_t)
+            cfs.len() as libc::size_t,
+            readopts.inner)
     }
 
     fn get_opt<K: AsRef<[u8]>>(
@@ -1546,8 +1547,8 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
         &'a self,
         cfs: &[&impl AsColumnFamilyRef],
         opts: ReadOptions
-    ) -> DBRawIteratorWithThreadMode<'b, Self> {
-        DBRawIteratorWithThreadMode::new_atg(self, cfs, opts)
+    ) -> DBATGIteratorWithThreadMode<'b, Self> {
+        DBATGIteratorWithThreadMode::new(self, cfs, opts)
     }
 
     /// Opens a raw iterator over the database, using the default read options

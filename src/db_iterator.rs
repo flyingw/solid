@@ -13,12 +13,120 @@
 // limitations under the License.
 
 use crate::{
+    db,
     db::{DBAccess, DB},
     column_family::AsColumnFamilyRef,
     ffi, Error, ReadOptions, WriteBatch,
 };
 use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
+use std::ptr;
+
+pub type DBATGIterator<'a> = DBATGIteratorWithThreadMode<'a, DB>;
+
+pub struct DBATGIteratorWithThreadMode<'a, D: DBAccess> {
+    inner: std::ptr::NonNull<ffi::rocksdb_iterator_atg_t>,
+    _readopts: ReadOptions,
+    db: PhantomData<&'a D>,
+}
+
+impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
+    pub(crate) fn new(db: &D, 
+        cfs: &[&impl AsColumnFamilyRef],
+        readopts: ReadOptions) -> Self {
+        
+        let inner = unsafe { db.create_iterator_atg(cfs, &readopts) };
+        Self::from_inner(inner, readopts)
+    }
+
+    pub fn valid(&self) -> bool {
+        unsafe { ffi::rocksdb_iter_atg_valid(self.inner.as_ptr()) != 0 }
+    }
+
+    pub fn seek_to_first(&mut self) {
+        unsafe {
+            ffi::rocksdb_iter_atg_seek_to_first(self.inner.as_ptr());
+        }
+    }
+
+    /// Seeks to the next key.
+    pub fn next(&mut self) {
+        if self.valid() {
+            unsafe {
+                ffi::rocksdb_iter_atg_next(self.inner.as_ptr());
+            }
+        }
+    }
+
+    pub fn key(&self) -> Option<&[u8]> {
+        if self.valid() {
+            Some(self.key_impl())
+        } else {
+            None
+        }
+    }
+
+    fn key_impl(&self) -> &[u8] {
+        // Safety Note: This is safe as all methods that may invalidate the buffer returned
+        // take `&mut self`, so borrow checker will prevent use of buffer after seek.
+        unsafe {
+            let mut key_len: size_t = 0;
+            let key_len_ptr: *mut size_t = &mut key_len;
+            let key_ptr = ffi::rocksdb_iter_atg_key(self.inner.as_ptr(), key_len_ptr);
+            slice::from_raw_parts(key_ptr as *const c_uchar, key_len)
+        }
+    }
+
+    pub fn attribute_groups(&self) ->  Vec<Result<Option<Vec<u8>>, Error>> {
+        if self.valid() {
+            self.attribute_groups_impl()
+        } else {
+            vec![]
+        }
+    }
+
+    fn attribute_groups_impl(&self) -> Vec<Result<Option<Vec<u8>>, Error>> {
+        let mut len: size_t = 0;
+
+        let mut values: *mut *mut c_char = ptr::null_mut();
+        let mut values_sizes: *mut size_t = ptr::null_mut();
+        let mut errors: *mut *mut c_char = ptr::null_mut();
+
+        unsafe {
+            ffi::rocksdb_iter_attribute_groups(
+                self.inner.as_ptr(), 
+                &mut values,
+                &mut values_sizes,
+                &mut errors,
+                &mut len);
+
+            let values = slice::from_raw_parts(values, len);
+            let values_sizes = slice::from_raw_parts(values_sizes, len);
+            let errors = slice::from_raw_parts(errors, len);
+            db::convert_values(values.to_vec(), values_sizes.to_vec(), errors.to_vec())
+        } 
+    }
+
+    fn from_inner(inner: *mut ffi::rocksdb_iterator_atg_t, readopts: ReadOptions) -> Self {
+        let inner = std::ptr::NonNull::new(inner).unwrap();
+        Self {
+            inner,
+            _readopts: readopts,
+            db: PhantomData,
+        }
+    }
+}
+
+impl<D: DBAccess> Drop for DBATGIteratorWithThreadMode<'_, D> {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::rocksdb_iter_atg_destroy(self.inner.as_ptr());
+        }
+    }
+}
+
+unsafe impl<D: DBAccess> Send for DBATGIteratorWithThreadMode<'_, D> {}
+unsafe impl<D: DBAccess> Sync for DBATGIteratorWithThreadMode<'_, D> {}
 
 /// A type alias to keep compatibility. See [`DBRawIteratorWithThreadMode`] for details
 pub type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, DB>;
@@ -115,13 +223,13 @@ impl<'a, D: DBAccess> DBRawIteratorWithThreadMode<'a, D> {
         Self::from_inner(inner, readopts)
     }
 
-    pub(crate) fn new_atg(db: &'a D,
-        cfs: &[&impl AsColumnFamilyRef],
-        readopts: ReadOptions,
-    ) -> Self {
-        let inner = unsafe { db.create_iterator_atg(cfs, &readopts) };
-        Self::from_inner(inner, readopts)
-    }
+    // pub(crate) fn new_atg(db: &'a D,
+    //     cfs: &[&impl AsColumnFamilyRef],
+    //     readopts: ReadOptions,
+    // ) -> Self {
+    //     let inner = unsafe { db.create_iterator_atg(cfs, &readopts) };
+    //     Self::from_inner(inner, readopts)
+    // }
 
     fn from_inner(inner: *mut ffi::rocksdb_iterator_t, readopts: ReadOptions) -> Self {
         // This unwrap will never fail since rocksdb_create_iterator and
