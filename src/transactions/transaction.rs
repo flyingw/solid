@@ -74,14 +74,14 @@ impl<DB> DBAccess for Transaction<'_, DB> {
         &self,
         cfs: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_t {
+    ) -> *mut ffi::rocksdb_iterator_atg_t {
         let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
 
-        ffi::rocksdb_transaction_create_iterator_coalescing(
+        ffi::rocksdb_transaction_create_iterator_atg(
             self.inner,
-            readopts.inner,
             cfs.as_mut_ptr(), 
-            cfs.len() as libc::size_t)
+            cfs.len() as libc::size_t,
+            readopts.inner)
     }
 
     fn get_opt<K: AsRef<[u8]>>(
