@@ -367,7 +367,6 @@ fn test_atg_iterator() {
              println!("atg|{:?}=>{:?}", key, atg);
             it.next();
         }
-
        
     }
 }

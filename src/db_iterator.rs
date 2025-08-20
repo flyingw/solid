@@ -49,6 +49,12 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
         }
     }
 
+    pub fn seek_to_last(&mut self) {
+        unsafe {
+            ffi::rocksdb_iter_atg_seek_to_last(self.inner.as_ptr());
+        }
+    }
+
     /// Seeks to the next key.
     pub fn next(&mut self) {
         if self.valid() {
