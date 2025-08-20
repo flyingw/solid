@@ -55,11 +55,43 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
         }
     }
 
+    pub fn seek<K: AsRef<[u8]>>(&mut self, key: K) {
+        let key = key.as_ref();
+
+        unsafe {
+            ffi::rocksdb_iter_atg_seek(
+                self.inner.as_ptr(),
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+            );
+        }
+    }
+
+    pub fn seek_for_prev<K: AsRef<[u8]>>(&mut self, key: K) {
+        let key = key.as_ref();
+
+        unsafe {
+            ffi::rocksdb_iter_atg_seek_for_prev(
+                self.inner.as_ptr(),
+                key.as_ptr() as *const c_char,
+                key.len() as size_t,
+            );
+        }
+    }
+
     /// Seeks to the next key.
     pub fn next(&mut self) {
         if self.valid() {
             unsafe {
                 ffi::rocksdb_iter_atg_next(self.inner.as_ptr());
+            }
+        }
+    }
+
+    pub fn prev(&mut self) {
+        if self.valid() {
+            unsafe {
+                ffi::rocksdb_iter_atg_prev(self.inner.as_ptr());
             }
         }
     }
