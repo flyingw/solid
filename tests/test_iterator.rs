@@ -353,7 +353,7 @@ fn test_atg_iterator() {
         assert!(db.put_cf(&cf2, B1, B1).is_ok());
         assert!(db.put_cf(&cf2, B2, B2).is_ok());
 
-        let mut it = db.attribute_group_iterator(&[&cf1, &cf2], ReadOptions::default());
+        let mut it = db.atg_iterator(&[&cf1, &cf2], ReadOptions::default());
         it.seek_to_first();
 
         while it.valid() {

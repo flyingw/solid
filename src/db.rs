@@ -1543,7 +1543,7 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
         DBRawIteratorWithThreadMode::new_coalesce(self, cfs, opts)
     }
 
-    pub fn attribute_group_iterator<'a: 'b, 'b>(
+    pub fn atg_iterator<'a: 'b, 'b>(
         &'a self,
         cfs: &[&impl AsColumnFamilyRef],
         opts: ReadOptions
