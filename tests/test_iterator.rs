@@ -350,6 +350,7 @@ fn test_atg_iterator() {
 
         assert!(db.put_cf(&cf1, A1, A1).is_ok());
         assert!(db.put_cf(&cf1, A2, A2).is_ok());
+
         assert!(db.put_cf(&cf2, B1, B1).is_ok());
         assert!(db.put_cf(&cf2, B2, B2).is_ok());
 
@@ -364,13 +365,13 @@ fn test_atg_iterator() {
                 .filter(|o| o.is_some())
                 .flat_map(|ag| ag.unwrap())
                 .collect();
-             println!("atg|{:?}=>{:?}", key, atg);
+
+            println!("atg|{:?}=>{:?}", key, atg);
             it.next();
         }
        
     }
 }
-
 
 #[test]
 fn test_iterator_outlive_db() {
