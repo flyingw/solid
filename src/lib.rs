@@ -119,7 +119,8 @@ pub use crate::{
     },
     db_iterator::{
         DBIterator, DBIteratorWithThreadMode, DBRawIterator, DBRawIteratorWithThreadMode,
-        DBWALIterator, Direction, IteratorMode, DBAtgIterator, DBRawAttributeGroupIteratorWithThreadMode
+        DBWALIterator, Direction, IteratorMode,
+        DBATGIterator, DBATGIteratorWithThreadMode,
     },
     db_options::{
         BlockBasedIndexType, BlockBasedOptions, BottommostLevelCompaction, Cache, ChecksumType,
@@ -247,7 +248,7 @@ mod test {
         db_options::{CacheWrapper, WriteBufferManagerWrapper},
         env::{Env, EnvWrapper},
         BlockBasedOptions, BoundColumnFamily, Cache, ColumnFamily, ColumnFamilyDescriptor,
-        DBIterator, DBRawIterator, DBAtgIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
+        DBIterator, DBRawIterator, DBATGIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
         ReadOptions, Snapshot, SstFileWriter, WriteBatch, WriteBufferManager, WriteOptions, DB,
     };
 
@@ -263,7 +264,7 @@ mod test {
         is_send::<DB>();
         is_send::<DBIterator<'_>>();
         is_send::<DBRawIterator<'_>>();
-        is_send::<DBAtgIterator<'_>>();
+        is_send::<DBATGIterator<'_>>();
         is_send::<Snapshot>();
         is_send::<Options>();
         is_send::<ReadOptions>();
