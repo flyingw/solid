@@ -3,14 +3,18 @@ use core::ops::Deref;
 use libc::size_t;
 use std::marker::PhantomData;
 use std::slice;
-use rustler::NifStruct;
+use rustler::{Encoder, Env, Term};
 
-#[derive(NifStruct, Debug, Clone)]
-#[rustler(encode, decode)]
-#[module = "WideColumn"]
+#[derive(Debug, Clone)]
 pub struct WideColumn {
   pub cf:   String,
   pub value:  String,
+}
+
+impl Encoder for WideColumn {
+    fn encode<'a>(&self, env: Env<'a>) -> Term<'a> {
+        (self.cf.clone(), self.value.clone()).encode(env)
+    }
 }
 
 pub struct WideColumns<'a> {
