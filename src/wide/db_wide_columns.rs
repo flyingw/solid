@@ -5,7 +5,8 @@ use std::marker::PhantomData;
 use std::slice;
 use rustler::NifStruct;
 
-#[derive(NifStruct, Debug)]
+#[derive(NifStruct, Debug, Clone)]
+#[rustler(encode, decode)]
 #[module = "WideColumn"]
 pub struct WideColumn {
   pub cf:   String,
