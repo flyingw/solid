@@ -3,8 +3,10 @@ use core::ops::Deref;
 use libc::size_t;
 use std::marker::PhantomData;
 use std::slice;
+use rustler::NifStruct;
 
-#[derive(Debug)]
+#[derive(NifStruct, Debug)]
+#[module = "WideColumn"]
 pub struct WideColumn {
   pub cf:   String,
   pub value:  String,
