@@ -4,9 +4,10 @@ use libc::size_t;
 use std::marker::PhantomData;
 use std::slice;
 
-pub struct WideColumn <'a> {
-  name: &'a str,
-  value: &'a str,
+#[derive(Debug)]
+pub struct WideColumn {
+  pub cf:   String,
+  pub value:  String,
 }
 
 pub struct WideColumns<'a> {
