@@ -122,7 +122,7 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
             self.attribute_groups_impl()
         } else {
             let mut result = Vec::new();
-            result.push(WideColumn { cf: String::new(), value: String::new()});
+            result.push(WideColumn { cf: String::new(), value: (&[]).to_vec()});
             return result;
         }
     }
@@ -143,7 +143,7 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
 
             for col in list {
                 let wc = WideColumns::from_c(col.clone());
-                let value = String::from_utf8_lossy(wc.value()).into_owned();
+                let value = wc.value().to_vec();
                 let cf = String::from_utf8_lossy(wc.name()).into_owned();
                 result.push(WideColumn { cf,  value: value });
             }
