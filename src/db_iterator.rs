@@ -11,12 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use crate::wide::db_wide_columns::WideColumns;
+use crate::wide::db_wide_columns::WideColumn;
 use crate::{
     db,
     db::{DBAccess, DB},
     column_family::AsColumnFamilyRef,
     ffi, Error, ReadOptions, WriteBatch,
+    
 };
 use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
@@ -115,33 +117,38 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
         }
     }
 
-    pub fn attribute_groups(&self) ->  Vec<Result<Option<Vec<u8>>, Error>> {
+    pub fn attribute_groups(&self) ->  Vec<WideColumn> {
         if self.valid() {
             self.attribute_groups_impl()
         } else {
-            vec![]
+            let mut result = Vec::new();
+            result.push(WideColumn { cf: String::new(), value: Vec::new()});
+            return result;
         }
     }
 
-    fn attribute_groups_impl(&self) -> Vec<Result<Option<Vec<u8>>, Error>> {
-        let mut len: size_t = 0;
-
-        let mut values: *mut *mut c_char = ptr::null_mut();
-        let mut values_sizes: *mut size_t = ptr::null_mut();
-        let mut errors: *mut *mut c_char = ptr::null_mut();
+    fn attribute_groups_impl(&self) ->  Vec<WideColumn> {
+        let mut values: *mut *mut ffi::rocksdb_widecolumns_t = ptr::null_mut();
+        let mut values_sizes: usize = 0;
 
         unsafe {
             ffi::rocksdb_iter_attribute_groups(
                 self.inner.as_ptr(), 
                 &mut values,
-                &mut values_sizes,
-                &mut errors,
-                &mut len);
+                &mut values_sizes);
+            
 
-            let values = slice::from_raw_parts(values, len);
-            let values_sizes = slice::from_raw_parts(values_sizes, len);
-            let errors = slice::from_raw_parts(errors, len);
-            db::convert_values(values.to_vec(), values_sizes.to_vec(), errors.to_vec())
+            let list = slice::from_raw_parts(values, values_sizes);
+            let mut result = Vec::new();
+
+            for col in list {
+                let wc = WideColumns::from_c(col.clone());
+                let value = wc.value().to_vec();
+                let cf = String::from_utf8_lossy(wc.name()).into_owned();
+                result.push(WideColumn { cf,  value: value });
+            }
+
+            result  
         } 
     }
 

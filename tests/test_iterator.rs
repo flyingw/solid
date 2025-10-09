@@ -16,9 +16,11 @@ mod util;
 
 use pretty_assertions::assert_eq;
 
-use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode, WideColumns};
+use rocksdb::{Direction, IteratorMode, MemtableFactory, Options, DB, DBRawIteratorWithThreadMode};
 use util::{assert_iter, assert_iter_reversed, pair, DBPath};
 use rocksdb::ReadOptions;
+use rocksdb::wide::db_wide_columns::WideColumn;
+
 
 #[test]
 #[allow(clippy::cognitive_complexity)]
@@ -359,14 +361,11 @@ fn test_atg_iterator() {
 
         while it.valid() {
             let key: Box<[u8]> = it.key().unwrap().into();
-            let atg: Vec<u8> = it.attribute_groups()
-                .into_iter()
-                .map(|ag| ag.unwrap())
-                .filter(|o| o.is_some())
-                .flat_map(|ag| ag.unwrap())
-                .collect();
+            let atg: Vec<WideColumn> = it.attribute_groups();
 
-            println!("atg|{:?}=>{:?}", key, atg);
+            for col in &atg {
+    println!("cf={:?}", col);
+}
             it.next();
         }
        
