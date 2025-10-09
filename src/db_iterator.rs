@@ -122,7 +122,7 @@ impl<'a, D: DBAccess> DBATGIteratorWithThreadMode<'a, D> {
             self.attribute_groups_impl()
         } else {
             let mut result = Vec::new();
-            result.push(WideColumn { cf: String::new(), value: (&[]).to_vec()});
+            result.push(WideColumn { cf: String::new(), value: Vec::new()});
             return result;
         }
     }
