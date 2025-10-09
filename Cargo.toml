@@ -42,7 +42,6 @@ libc = "0.2"
 librocksdb-sys = { path = "librocksdb-sys", version = "0.18.0", default-features = false, features = [
     "static",
 ] }
-rustler = "0.37.0"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
