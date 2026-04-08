@@ -20,6 +20,7 @@ use crate::{
 };
 use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
+use std::ptr;
 
 pub type DBATGIterator<'a> = DBATGIteratorWithThreadMode<'a, DB>;
 
