@@ -114,23 +114,24 @@ pub use crate::{
     },
     compaction_filter::Decision as CompactionDecision,
     db::{
-        DBAccess, DBCommon, DBWithThreadMode, LiveFile, MultiThreaded, Range, SingleThreaded,
-        ThreadMode, DB,
+        DBAccess, DBCommon, DBWithThreadMode, LiveFile, MultiThreaded, SingleThreaded, ThreadMode,
+        DB, ColumnFamilyMetaData,
     },
     db_iterator::{
         DBIterator, DBIteratorWithThreadMode, DBRawIterator, DBRawIteratorWithThreadMode,
-        DBWALIterator, Direction, IteratorMode, DBAtgIterator, DBRawAttributeGroupIteratorWithThreadMode,
+        DBWALIterator, Direction, IteratorMode,
+        DBATGIterator, DBATGIteratorWithThreadMode,
     },
     db_options::{
-        BlockBasedIndexType, BlockBasedOptions, BlockBasedTablePinningTier,
-        BottommostLevelCompaction, Cache, ChecksumType, CompactOptions, CompactionPri,
-        CuckooTableOptions, DBCompactionStyle, DBCompressionType, DBPath, DBRecoveryMode,
-        DataBlockIndexType, FifoCompactOptions, FlushOptions, InfoLogger,
+        BlockBasedIndexType, BlockBasedOptions, BottommostLevelCompaction, Cache, ChecksumType,
+        CompactOptions, CompactionPri, CuckooTableOptions, DBCompactionStyle, DBCompressionType,
+        DBPath, DBRecoveryMode, DataBlockIndexType, FifoCompactOptions, FlushOptions,
         IngestExternalFileOptions, KeyEncodingType, LogLevel, LruCacheOptions, MemtableFactory,
         Options, PlainTableFactoryOptions, ReadOptions, ReadTier, UniversalCompactOptions,
         UniversalCompactionStopStyle, WaitForCompactOptions, WriteBufferManager, WriteOptions,
     },
-    wide::db_wide_columns::{WideColumns,WideColumn},
+    wide::db_wide_columns::WideColumns,
+    wide::db_wide_columns::WideColumn,
     db_pinnable_slice::DBPinnableSlice,
     env::Env,
     ffi_util::CStrLike,
@@ -144,16 +145,8 @@ pub use crate::{
         OptimisticTransactionDB, OptimisticTransactionOptions, Transaction, TransactionDB,
         TransactionDBOptions, TransactionOptions,
     },
-    write_batch::{
-        WriteBatch, WriteBatchIterator, WriteBatchIteratorCf, WriteBatchWithTransaction,
-    },
+    write_batch::{WriteBatch, WriteBatchIterator, WriteBatchWithTransaction},
 };
-
-#[cfg(feature = "raw-ptr")]
-mod raw_ptr;
-
-#[cfg(feature = "raw-ptr")]
-pub use crate::raw_ptr::AsRawPtr;
 
 use librocksdb_sys as ffi;
 
@@ -256,7 +249,7 @@ mod test {
         db_options::{CacheWrapper, WriteBufferManagerWrapper},
         env::{Env, EnvWrapper},
         BlockBasedOptions, BoundColumnFamily, Cache, ColumnFamily, ColumnFamilyDescriptor,
-        DBIterator, DBRawIterator, DBAtgIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
+        DBIterator, DBRawIterator, DBATGIterator, IngestExternalFileOptions, Options, PlainTableFactoryOptions,
         ReadOptions, Snapshot, SstFileWriter, WriteBatch, WriteBufferManager, WriteOptions, DB,
     };
 
@@ -272,7 +265,7 @@ mod test {
         is_send::<DB>();
         is_send::<DBIterator<'_>>();
         is_send::<DBRawIterator<'_>>();
-        is_send::<DBAtgIterator<'_>>();
+        is_send::<DBATGIterator<'_>>();
         is_send::<Snapshot>();
         is_send::<Options>();
         is_send::<ReadOptions>();

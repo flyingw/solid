@@ -22,8 +22,8 @@ use crate::{
         raw_data, to_cpath, CStrLike,
     },
     ColumnFamily, ColumnFamilyDescriptor, CompactOptions, DBIteratorWithThreadMode,
-    DBRawAttributeGroupIteratorWithThreadMode,
     DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, Direction, Error, FlushOptions,
+    DBATGIteratorWithThreadMode,
     IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
     WaitForCompactOptions, WriteBatch, WriteOptions, DEFAULT_COLUMN_FAMILY_NAME,
 };
@@ -171,11 +171,11 @@ pub trait DBAccess {
         readopts: &ReadOptions,
     ) -> *mut ffi::rocksdb_iterator_t;
 
-    unsafe fn create_iterator_attribute_group(
+    unsafe fn create_iterator_atg(
         &self,
         handles: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_attributegroup_t;
+    ) -> *mut ffi::rocksdb_iterator_atg_t;
 
     fn get_opt<K: AsRef<[u8]>>(
         &self,
@@ -258,17 +258,18 @@ impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
             cfs.len() as libc::size_t)
     }
 
-    unsafe fn create_iterator_attribute_group(&self,
+    unsafe fn create_iterator_atg(
+        &self,
         cfs: &[&impl AsColumnFamilyRef],
         readopts: &ReadOptions,
-    ) -> *mut ffi::rocksdb_iterator_attributegroup_t {
+    ) -> *mut ffi::rocksdb_iterator_atg_t {
         let mut cfs = cfs.iter().map(|cf| cf.inner()).collect::<Vec<_>>();
-
-        ffi::rocksdb_create_iterator_attribute_group(
+        // create atg
+        ffi::rocksdb_create_iterator_atg(
             self.inner.inner(),
-            readopts.inner,
-            cfs.as_mut_ptr(),
-            cfs.len() as libc::size_t)
+            cfs.as_mut_ptr(), 
+            cfs.len() as libc::size_t,
+            readopts.inner)
     }
 
     fn get_opt<K: AsRef<[u8]>>(
@@ -1063,6 +1064,14 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
         self.flush_cf_opt(cf, &FlushOptions::default())
     }
 
+    /// Enable file deletion.
+    pub fn enable_file_deletion(&self) -> Result<(), Error> {
+        unsafe {
+            ffi_try!(ffi::rocksdb_enable_file_deletions(self.inner.inner()));
+        }
+        Ok(())
+    }
+
     /// Return the bytes associated with a key value with read options. If you only intend to use
     /// the vector returned temporarily, consider using [`get_pinned_opt`](#method.get_pinned_opt)
     /// to avoid unnecessary memory copy.
@@ -1593,10 +1602,10 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
 
     pub fn atg_iterator<'a: 'b, 'b>(
         &'a self,
-        cfs: &[&impl AsColumnFamilyRef]
-    )-> DBRawAttributeGroupIteratorWithThreadMode<'b, Self> {
-        let opts = ReadOptions::default();
-        DBRawAttributeGroupIteratorWithThreadMode::new(self, cfs, opts)
+        cfs: &[&impl AsColumnFamilyRef],
+        opts: ReadOptions
+    ) -> DBATGIteratorWithThreadMode<'b, Self> {
+        DBATGIteratorWithThreadMode::new(self, cfs, opts)
     }
 
     /// Opens a raw iterator over the database, using the default read options
