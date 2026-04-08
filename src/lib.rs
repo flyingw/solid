@@ -119,7 +119,7 @@ pub use crate::{
     },
     db_iterator::{
         DBIterator, DBIteratorWithThreadMode, DBRawIterator, DBRawIteratorWithThreadMode,
-        DBWALIterator, Direction, IteratorMode,
+        DBWALIterator, Direction, IteratorMode, DBATGIterator, DBATGIteratorWithThreadMode,
     },
     db_options::{
         BlockBasedIndexType, BlockBasedOptions, BlockBasedTablePinningTier,
