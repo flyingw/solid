@@ -4363,12 +4363,6 @@ impl ReadOptions {
             ffi::rocksdb_readoptions_set_iter_start_ts(self.inner, ptr, len);
         }
     }
-
-    pub fn set_allow_unprepared_value(&mut self, v: bool) {
-        unsafe {
-            ffi::rocksdb_readoptions_set_allow_unprepared_value(self.inner, c_uchar::from(v));
-        }
-    }
 }
 
 impl Default for ReadOptions {

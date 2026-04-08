@@ -14,15 +14,17 @@
 //
 
 use crate::{
-    column_family::AsColumnFamilyRef,
-    column_family::BoundColumnFamily,
-    column_family::UnboundColumnFamily,
+    column_family::{AsColumnFamilyRef, BoundColumnFamily, UnboundColumnFamily},
     db_options::OptionsMustOutliveDB,
     ffi,
-    ffi_util::{from_cstr, opt_bytes_to_ptr, raw_data, to_cpath, CStrLike},
+    ffi_util::{
+        convert_rocksdb_error, from_cstr_and_free, from_cstr_without_free, opt_bytes_to_ptr,
+        raw_data, to_cpath, CStrLike,
+    },
     ColumnFamily, ColumnFamilyDescriptor, CompactOptions, DBIteratorWithThreadMode,
-    DBRawAttributeGroupIteratorWithThreadMode, DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, 
-    Direction, Error, FlushOptions, IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
+    DBRawAttributeGroupIteratorWithThreadMode,
+    DBPinnableSlice, DBRawIteratorWithThreadMode, DBWALIterator, Direction, Error, FlushOptions,
+    IngestExternalFileOptions, IteratorMode, Options, ReadOptions, SnapshotWithThreadMode,
     WaitForCompactOptions, WriteBatch, WriteOptions, DEFAULT_COLUMN_FAMILY_NAME,
 };
 
@@ -42,6 +44,20 @@ use std::str;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
+
+/// A range of keys, `start_key` is included, but not `end_key`.
+///
+/// You should make sure `end_key` is not less than `start_key`.
+pub struct Range<'a> {
+    start_key: &'a [u8],
+    end_key: &'a [u8],
+}
+
+impl<'a> Range<'a> {
+    pub fn new(start_key: &'a [u8], end_key: &'a [u8]) -> Range<'a> {
+        Range { start_key, end_key }
+    }
+}
 
 /// Marker trait to specify single or multi threaded column family alternations for
 /// [`DBWithThreadMode<T>`]
@@ -209,15 +225,15 @@ pub trait DBAccess {
 
 impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
     unsafe fn create_snapshot(&self) -> *const ffi::rocksdb_snapshot_t {
-        ffi::rocksdb_create_snapshot(self.inner.inner())
+        unsafe { ffi::rocksdb_create_snapshot(self.inner.inner()) }
     }
 
     unsafe fn release_snapshot(&self, snapshot: *const ffi::rocksdb_snapshot_t) {
-        ffi::rocksdb_release_snapshot(self.inner.inner(), snapshot);
+        unsafe { ffi::rocksdb_release_snapshot(self.inner.inner(), snapshot) };
     }
 
     unsafe fn create_iterator(&self, readopts: &ReadOptions) -> *mut ffi::rocksdb_iterator_t {
-        ffi::rocksdb_create_iterator(self.inner.inner(), readopts.inner)
+        unsafe { ffi::rocksdb_create_iterator(self.inner.inner(), readopts.inner) }
     }
 
     unsafe fn create_iterator_cf(
@@ -225,7 +241,7 @@ impl<T: ThreadMode, D: DBInner> DBAccess for DBCommon<T, D> {
         cf_handle: *mut ffi::rocksdb_column_family_handle_t,
         readopts: &ReadOptions,
     ) -> *mut ffi::rocksdb_iterator_t {
-        ffi::rocksdb_create_iterator_cf(self.inner.inner(), readopts.inner, cf_handle)
+        unsafe { ffi::rocksdb_create_iterator_cf(self.inner.inner(), readopts.inner, cf_handle) }
     }
 
     unsafe fn create_iterator_coalescing(
@@ -896,6 +912,35 @@ impl<T: ThreadMode> DBWithThreadMode<T> {
         wo.disable_wal(true);
         self.write_opt(batch, &wo)
     }
+
+    /// Suspend deleting obsolete files. Compactions will continue to occur,
+    /// but no obsolete files will be deleted. To resume file deletions, each
+    /// call to disable_file_deletions() must be matched by a subsequent call to
+    /// enable_file_deletions(). For more details, see enable_file_deletions().
+    pub fn disable_file_deletions(&self) -> Result<(), Error> {
+        unsafe {
+            ffi_try!(ffi::rocksdb_disable_file_deletions(self.inner.inner()));
+        }
+        Ok(())
+    }
+
+    /// Resume deleting obsolete files, following up on `disable_file_deletions()`.
+    ///
+    /// File deletions disabling and enabling is not controlled by a binary flag,
+    /// instead it's represented as a counter to allow different callers to
+    /// independently disable file deletion. Disabling file deletion can be
+    /// critical for operations like making a backup. So the counter implementation
+    /// makes the file deletion disabled as long as there is one caller requesting
+    /// so, and only when every caller agrees to re-enable file deletion, it will
+    /// be enabled. Two threads can call this method concurrently without
+    /// synchronization -- i.e., file deletions will be enabled only after both
+    /// threads call enable_file_deletions()
+    pub fn enable_file_deletions(&self) -> Result<(), Error> {
+        unsafe {
+            ffi_try!(ffi::rocksdb_enable_file_deletions(self.inner.inner()));
+        }
+        Ok(())
+    }
 }
 
 /// Common methods of `DBWithThreadMode` and `OptimisticTransactionDB`.
@@ -922,7 +967,7 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
 
             let vec = slice::from_raw_parts(ptr, length)
                 .iter()
-                .map(|ptr| CStr::from_ptr(*ptr).to_string_lossy().into_owned())
+                .map(|ptr| from_cstr_without_free(*ptr))
                 .collect();
             ffi::rocksdb_list_column_families_destroy(ptr, length);
             Ok(vec)
@@ -1016,14 +1061,6 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
     /// options.
     pub fn flush_cf(&self, cf: &impl AsColumnFamilyRef) -> Result<(), Error> {
         self.flush_cf_opt(cf, &FlushOptions::default())
-    }
-
-    /// Enable file deletion.
-    pub fn enable_file_deletion(&self) -> Result<(), Error> {
-        unsafe {
-            ffi_try!(ffi::rocksdb_enable_file_deletions(self.inner.inner()));
-        }
-        Ok(())
     }
 
     /// Return the bytes associated with a key value with read options. If you only intend to use
@@ -1323,7 +1360,7 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
                             Ok(Some(DBPinnableSlice::from_c(v)))
                         }
                     } else {
-                        Err(Error::new(crate::ffi_util::error_message(e)))
+                        Err(convert_rocksdb_error(e))
                     }
                 })
                 .collect()
@@ -1439,13 +1476,25 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
                 "Failed to convert path to CString when creating cf: {err}"
             ))
         })?;
-        Ok(unsafe {
-            ffi_try!(ffi::rocksdb_create_column_family(
+
+        // Can't use ffi_try: rocksdb_create_column_family has a bug where it allocates a
+        // result that needs to be freed on error
+        let mut err: *mut ::libc::c_char = ::std::ptr::null_mut();
+        let cf_handle = unsafe {
+            ffi::rocksdb_create_column_family(
                 self.inner.inner(),
                 opts.inner,
                 cf_name.as_ptr(),
-            ))
-        })
+                &mut err,
+            )
+        };
+        if !err.is_null() {
+            if !cf_handle.is_null() {
+                unsafe { ffi::rocksdb_column_family_handle_destroy(cf_handle) };
+            }
+            return Err(convert_rocksdb_error(err));
+        }
+        Ok(cf_handle)
     }
 
     pub fn iterator<'a: 'b, 'b>(
@@ -2217,6 +2266,80 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
         unsafe { ffi::rocksdb_get_latest_sequence_number(self.inner.inner()) }
     }
 
+    /// Return the approximate file system space used by keys in each ranges.
+    ///
+    /// Note that the returned sizes measure file system space usage, so
+    /// if the user data compresses by a factor of ten, the returned
+    /// sizes will be one-tenth the size of the corresponding user data size.
+    ///
+    /// Due to lack of abi, only data flushed to disk is taken into account.
+    pub fn get_approximate_sizes(&self, ranges: &[Range]) -> Vec<u64> {
+        self.get_approximate_sizes_cfopt(None::<&ColumnFamily>, ranges)
+    }
+
+    pub fn get_approximate_sizes_cf(
+        &self,
+        cf: &impl AsColumnFamilyRef,
+        ranges: &[Range],
+    ) -> Vec<u64> {
+        self.get_approximate_sizes_cfopt(Some(cf), ranges)
+    }
+
+    fn get_approximate_sizes_cfopt(
+        &self,
+        cf: Option<&impl AsColumnFamilyRef>,
+        ranges: &[Range],
+    ) -> Vec<u64> {
+        let start_keys: Vec<*const c_char> = ranges
+            .iter()
+            .map(|x| x.start_key.as_ptr() as *const c_char)
+            .collect();
+        let start_key_lens: Vec<_> = ranges.iter().map(|x| x.start_key.len()).collect();
+        let end_keys: Vec<*const c_char> = ranges
+            .iter()
+            .map(|x| x.end_key.as_ptr() as *const c_char)
+            .collect();
+        let end_key_lens: Vec<_> = ranges.iter().map(|x| x.end_key.len()).collect();
+        let mut sizes: Vec<u64> = vec![0; ranges.len()];
+        let (n, start_key_ptr, start_key_len_ptr, end_key_ptr, end_key_len_ptr, size_ptr) = (
+            ranges.len() as i32,
+            start_keys.as_ptr(),
+            start_key_lens.as_ptr(),
+            end_keys.as_ptr(),
+            end_key_lens.as_ptr(),
+            sizes.as_mut_ptr(),
+        );
+        let mut err: *mut c_char = ptr::null_mut();
+        match cf {
+            None => unsafe {
+                ffi::rocksdb_approximate_sizes(
+                    self.inner.inner(),
+                    n,
+                    start_key_ptr,
+                    start_key_len_ptr,
+                    end_key_ptr,
+                    end_key_len_ptr,
+                    size_ptr,
+                    &mut err,
+                );
+            },
+            Some(cf) => unsafe {
+                ffi::rocksdb_approximate_sizes_cf(
+                    self.inner.inner(),
+                    cf.inner(),
+                    n,
+                    start_key_ptr,
+                    start_key_len_ptr,
+                    end_key_ptr,
+                    end_key_len_ptr,
+                    size_ptr,
+                    &mut err,
+                );
+            },
+        }
+        sizes
+    }
+
     /// Iterate over batches of write operations since a given sequence.
     ///
     /// Produce an iterator that will provide the batches of write operations
@@ -2339,7 +2462,7 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
 
             let metadata = ColumnFamilyMetaData {
                 size: ffi::rocksdb_column_family_metadata_get_size(ptr),
-                name: from_cstr(ffi::rocksdb_column_family_metadata_get_name(ptr)),
+                name: from_cstr_and_free(ffi::rocksdb_column_family_metadata_get_name(ptr)),
                 file_count: ffi::rocksdb_column_family_metadata_get_file_count(ptr),
             };
 
@@ -2361,7 +2484,7 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
 
             let metadata = ColumnFamilyMetaData {
                 size: ffi::rocksdb_column_family_metadata_get_size(ptr),
-                name: from_cstr(ffi::rocksdb_column_family_metadata_get_name(ptr)),
+                name: from_cstr_and_free(ffi::rocksdb_column_family_metadata_get_name(ptr)),
                 file_count: ffi::rocksdb_column_family_metadata_get_file_count(ptr),
             };
 
@@ -2387,9 +2510,10 @@ impl<T: ThreadMode, D: DBInner> DBCommon<T, D> {
                 let mut key_size: usize = 0;
 
                 for i in 0..n {
+                    // rocksdb_livefiles_* returns pointers to strings, not copies
                     let column_family_name =
-                        from_cstr(ffi::rocksdb_livefiles_column_family_name(files, i));
-                    let name = from_cstr(ffi::rocksdb_livefiles_name(files, i));
+                        from_cstr_without_free(ffi::rocksdb_livefiles_column_family_name(files, i));
+                    let name = from_cstr_without_free(ffi::rocksdb_livefiles_name(files, i));
                     let size = ffi::rocksdb_livefiles_size(files, i);
                     let level = ffi::rocksdb_livefiles_level(files, i);
 
@@ -2687,7 +2811,7 @@ pub(crate) fn convert_values(
                 }
                 Ok(value)
             } else {
-                Err(Error::new(crate::ffi_util::error_message(e)))
+                Err(convert_rocksdb_error(e))
             }
         })
         .collect()

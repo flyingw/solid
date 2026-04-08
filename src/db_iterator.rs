@@ -14,15 +14,12 @@
 use crate::wide::db_wide_columns::WideColumns;
 use crate::wide::db_wide_columns::WideColumn;
 use crate::{
-    db,
     db::{DBAccess, DB},
     column_family::AsColumnFamilyRef,
     ffi, Error, ReadOptions, WriteBatch,
-    
 };
 use libc::{c_char, c_uchar, size_t};
 use std::{marker::PhantomData, slice};
-use std::ptr;
 
 pub type DBATGIterator<'a> = DBATGIteratorWithThreadMode<'a, DB>;
 
@@ -176,13 +173,12 @@ unsafe impl<D: DBAccess> Sync for DBATGIteratorWithThreadMode<'_, D> {}
 /// A type alias to keep compatibility. See [`DBRawIteratorWithThreadMode`] for details
 pub type DBRawIterator<'a> = DBRawIteratorWithThreadMode<'a, DB>;
 
-/// An iterator over a database or column family, with specifiable
-/// ranges and direction.
+/// A low-level iterator over a database or column family, created by [`DB::raw_iterator`]
+/// and other `raw_iterator_*` methods.
 ///
-/// This iterator is different to the standard ``DBIteratorWithThreadMode`` as it aims Into
-/// replicate the underlying iterator API within RocksDB itself. This should
-/// give access to more performance and flexibility but departs from the
-/// widely recognized Rust idioms.
+/// This iterator replicates RocksDB's API. It should provide better
+/// performance and more features than [`DBIteratorWithThreadMode`], which is a standard
+/// Rust [`std::iter::Iterator`].
 ///
 /// ```
 /// use rocksdb::{DB, Options};
@@ -268,14 +264,6 @@ impl<'a, D: DBAccess> DBRawIteratorWithThreadMode<'a, D> {
         Self::from_inner(inner, readopts)
     }
 
-    // pub(crate) fn new_atg(db: &'a D,
-    //     cfs: &[&impl AsColumnFamilyRef],
-    //     readopts: ReadOptions,
-    // ) -> Self {
-    //     let inner = unsafe { db.create_iterator_atg(cfs, &readopts) };
-    //     Self::from_inner(inner, readopts)
-    // }
-
     fn from_inner(inner: *mut ffi::rocksdb_iterator_t, readopts: ReadOptions) -> Self {
         // This unwrap will never fail since rocksdb_create_iterator and
         // rocksdb_create_iterator_cf functions always return non-null. They
@@ -307,6 +295,21 @@ impl<'a, D: DBAccess> DBRawIteratorWithThreadMode<'a, D> {
     pub fn status(&self) -> Result<(), Error> {
         unsafe {
             ffi_try!(ffi::rocksdb_iter_get_error(self.inner.as_ptr()));
+        }
+        Ok(())
+    }
+
+    /// Refreshes the iterator to represent the latest state of the DB.
+    /// The iterator is invalidated after this call and must be re-sought
+    /// before use.
+    ///
+    /// If the iterator was created with a snapshot, the refreshed iterator
+    /// will no longer use that snapshot and will instead read the latest
+    /// DB state. The snapshot itself is not released; it remains valid and
+    /// will be released when the owning [`crate::SnapshotWithThreadMode`] is dropped.
+    pub fn refresh(&mut self) -> Result<(), Error> {
+        unsafe {
+            ffi_try!(ffi::rocksdb_iter_refresh(self.inner.as_ptr()));
         }
         Ok(())
     }
@@ -581,8 +584,10 @@ unsafe impl<D: DBAccess> Sync for DBRawIteratorWithThreadMode<'_, D> {}
 /// A type alias to keep compatibility. See [`DBIteratorWithThreadMode`] for details
 pub type DBIterator<'a> = DBIteratorWithThreadMode<'a, DB>;
 
-/// An iterator over a database or column family, with specifiable
-/// ranges and direction.
+/// A standard Rust [`Iterator`] over a database or column family.
+///
+/// As an alternative, [`DBRawIteratorWithThreadMode`] is a low level wrapper around
+/// RocksDB's API, which can provide better performance and more features.
 ///
 /// ```
 /// use rocksdb::{DB, Direction, IteratorMode, Options};
@@ -688,6 +693,16 @@ impl<'a, D: DBAccess> DBIteratorWithThreadMode<'a, D> {
                 Direction::Reverse
             }
         };
+    }
+
+    /// Refreshes the iterator, then re-seeks using the given mode.
+    ///
+    /// After a refresh the underlying iterator is invalidated, so a mode
+    /// must be provided to reposition it.
+    pub fn refresh(&mut self, mode: IteratorMode) -> Result<(), Error> {
+        self.raw.refresh()?;
+        self.set_mode(mode);
+        Ok(())
     }
 }
 
