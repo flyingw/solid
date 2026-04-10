@@ -27,6 +27,8 @@ db/blob/blob_log_sequential_reader.cc
 db/blob/blob_log_writer.cc
 db/blob/blob_source.cc
 db/blob/prefetch_buffer_collection.cc
+db/blob/blob_file_partition_manager.cc
+db/blob/blob_write_batch_transformer.cc
 db/builder.cc
 db/c.cc
 db/coalescing_iterator.cc
@@ -94,6 +96,7 @@ db/version_builder.cc
 db/version_edit.cc
 db/version_edit_handler.cc
 db/version_set.cc
+db/version_util.cc
 db/wal_edit.cc
 db/wal_manager.cc
 db/wide/wide_column_serialization.cc
@@ -194,6 +197,7 @@ table/block_based/partitioned_index_iterator.cc
 table/block_based/partitioned_index_reader.cc
 table/block_based/reader_common.cc
 table/block_based/uncompression_dict_reader.cc
+table/block_based/multi_scan_index_iterator.cc
 table/block_fetcher.cc
 table/cuckoo/cuckoo_table_builder.cc
 table/cuckoo/cuckoo_table_factory.cc
@@ -229,6 +233,7 @@ trace_replay/trace_record.cc
 trace_replay/trace_replay.cc
 trace_replay/block_cache_tracer.cc
 trace_replay/io_tracer.cc
+util/io_dispatcher_imp.cc
 util/async_file_reader.cc
 util/build_version.cc
 util/cleanable.cc
