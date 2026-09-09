@@ -26,6 +26,7 @@ db/blob/blob_log_format.cc
 db/blob/blob_log_sequential_reader.cc
 db/blob/blob_log_writer.cc
 db/blob/blob_source.cc
+db/blob/blob_gen2_format.cc
 db/blob/prefetch_buffer_collection.cc
 db/blob/blob_file_partition_manager.cc
 db/blob/blob_write_batch_transformer.cc
@@ -83,6 +84,7 @@ db/merge_operator.cc
 db/multi_scan.cc
 db/output_validator.cc
 db/periodic_task_scheduler.cc
+db/periodic_compaction_phaser.cc
 db/range_del_aggregator.cc
 db/range_tombstone_fragmenter.cc
 db/repair.cc
@@ -102,6 +104,8 @@ db/wal_manager.cc
 db/wide/wide_column_serialization.cc
 db/wide/wide_columns.cc
 db/wide/wide_columns_helper.cc
+db/wide/lazy_wide_columns.cc
+db/wide/read_path_blob_resolver.cc
 db/write_batch.cc
 db/write_batch_base.cc
 db/write_controller.cc
@@ -277,6 +281,7 @@ utilities/cassandra/cassandra_compaction_filter.cc
 utilities/cassandra/format.cc
 utilities/cassandra/merge_operator.cc
 utilities/checkpoint/checkpoint_impl.cc
+utilities/copy_engine/copy_engine.cc
 utilities/compaction_filters.cc
 utilities/compaction_filters/remove_emptyvalue_compactionfilter.cc
 utilities/convenience/info_log_finder.cc
@@ -328,6 +333,9 @@ utilities/transactions/write_prepared_txn.cc
 utilities/transactions/write_prepared_txn_db.cc
 utilities/transactions/write_unprepared_txn.cc
 utilities/transactions/write_unprepared_txn_db.cc
+utilities/trie_index/trie_index_factory.cc
+utilities/trie_index/bitvector.cc
+utilities/trie_index/louds_trie.cc
 utilities/ttl/db_ttl_impl.cc
 utilities/types_util.cc
 utilities/wal_filter.cc
