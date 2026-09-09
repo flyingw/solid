@@ -391,15 +391,15 @@ fn get_statistics_test() {
         let db = DB::open_cf(&opts, &path, vec!["cf1"]).unwrap();
         let cf = db.cf_handle("cf1").unwrap();
 
-        let initial_keys_written = opts.get_ticker_count(Ticker::NumberKeysWritten);
+        let initial_keys_written = opts.get_ticker_count(Ticker::BytesWritten);
         db.put_cf(&cf, b"key1", b"value").unwrap();
         db.put_cf(&cf, b"key2", b"value").unwrap();
         db.put_cf(&cf, b"key3", b"value").unwrap();
-        db.flush_cf(&cf).unwrap();
+        let _ = db.flush_cf(&cf).unwrap();
 
-        assert!(opts.get_ticker_count(Ticker::NumberKeysWritten) > 0);
+        assert!(opts.get_ticker_count(Ticker::BytesWritten) > 0);
         // We should see some counters increased
-        assert!(opts.get_ticker_count(Ticker::NumberKeysWritten) > initial_keys_written);
+        assert!(opts.get_ticker_count(Ticker::BytesWritten) > initial_keys_written);
 
         let histogram_data = opts.get_histogram_data(Histogram::DbWrite);
         assert!(histogram_data.count() > 0);
