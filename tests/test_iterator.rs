@@ -379,15 +379,15 @@ fn test_atg_iterator() {
         it.seek_to_first();
 
         while it.valid() {
-            let key: Box<[u8]> = it.key().unwrap().into();
-            let atg: Vec<WideColumn> = it.attribute_groups();
+          let _key: Box<[u8]> = it.key().unwrap().into();
+          let atg: Vec<WideColumn> = it.attribute_groups();
 
-            for col in &atg {
-    println!("cf={:?}", col);
-}
-            it.next();
+          for col in &atg {
+            println!("cf={:?}", col);
+          }
+          it.next();
         }
-       
+
     }
 }
 
