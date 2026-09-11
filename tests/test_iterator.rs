@@ -330,34 +330,19 @@ fn test_iterator_columns() {
         let mut it = db.coalescing_iterator(&[&cf1]);
         it.seek_to_first();
 
-        //let mut bin: Vec<WideColumns> = Vec::new();
         let mut bin: Vec<Box<[u8]>> = Vec::new();
 
         while it.valid() {
             let _key: Box<[u8]> = it.key().unwrap().into();
             let csx: Box<[u8]> = it.columns().unwrap().into();
-            //let csx: WideColumns = it.???().unwrap().into();
-
-            //assert_eq!(key, b"a1");
-            //let expected: Box<[u8]> = Box::<[u8;1]>::new([0;1]);
-            //assert_eq!(csx, expected);
             bin.push(csx);
-            //bin.push(s);
             it.next();
         }
-        // columns? {}
-        //{"col_1": "cf_3_val_1", "col_2": "cf_1_val_2", "col_3": "cf_2_val_3", "col_4": "cf_3_val_4"}.
         // const AA: &[u8] = b"cf1:a1";
+        // no column name in new serialization
+        const EX: &[u8] = b"\x01\x01\x00\x02a1";
 
-        // widecolumn serialization are kind of problem here. needs update
-        // const AA: &[u8]= &[160,
-                            // 120,
-                            // 127,
-                            // 204,
-                            // 143,
-                            // 123];
-
-        // assert_eq!(bin.as_slice(), &[Box::from(AA)]);
+        assert_eq!(bin.as_slice(), &[Box::from(EX)]);
     }
 }
 
