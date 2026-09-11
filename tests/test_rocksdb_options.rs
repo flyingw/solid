@@ -122,7 +122,7 @@ fn test_block_based_options() {
 
         assert!(settings.contains("cache_index_and_filter_blocks: 0\n"));
         assert!(settings.contains("pin_l0_filter_and_index_blocks_in_cache: 0\n"));
-        assert!(settings.contains("format_version: 8\n"));
+        assert!(settings.contains("format_version: 7\n"));
         assert!(settings.contains("index_block_restart_interval: 1\n"));
         assert!(settings.contains("cache_index_and_filter_blocks_with_high_priority: 1\n"));
     }
@@ -136,7 +136,7 @@ fn test_block_based_options() {
         let mut block_opts = BlockBasedOptions::default();
         block_opts.set_cache_index_and_filter_blocks(true);
         block_opts.set_pin_l0_filter_and_index_blocks_in_cache(true);
-        block_opts.set_format_version(4);
+        block_opts.set_format_version(8);
         block_opts.set_index_block_restart_interval(16);
         block_opts.set_cache_index_and_filter_blocks_with_high_priority(false);
 
@@ -148,7 +148,7 @@ fn test_block_based_options() {
         // check the settings are set in the LOG file
         assert!(settings.contains("cache_index_and_filter_blocks: 1\n"));
         assert!(settings.contains("pin_l0_filter_and_index_blocks_in_cache: 1\n"));
-        assert!(settings.contains("format_version: 4\n"));
+        assert!(settings.contains("format_version: 8\n"));
         assert!(settings.contains("index_block_restart_interval: 16\n"));
         assert!(settings.contains("cache_index_and_filter_blocks_with_high_priority: 0\n"));
     }
