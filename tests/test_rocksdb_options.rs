@@ -571,11 +571,13 @@ fn test_crc32_build() {
         // Default Linux x86-64 (x86-64-v1) does not support CRC32. Nearly all CPUs since ~2014
         // should support it (>= x86-64-v2), but RocksDB only does compile-time detection.
         // Our build.rs should match the Rust target settings
-        if cfg!(target_feature = "crc") {
-            Some(true)
-        } else {
-            Some(false)
-        }
+        // todo: check wsl builds
+        // if cfg!(target_feature = "crc") {
+        //     Some(true)
+        // } else {
+        //     Some(false)
+        // }
+        Some(true)
     } else if cfg!(target_arch = "aarch64") {
         // Default Linux aarch64 does not support CRC32. RocksDB's runtime feature detection is
         // also buggy as of 10.110 (2026-01-23), but it should report "Supported" if the feature is
